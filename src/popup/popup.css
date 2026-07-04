@@ -1,9 +1,16 @@
 body { width: 360px; padding: 10px; }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.hleft { display: flex; align-items: center; gap: 10px; }
 .brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .brand strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
 .brand:hover strong { color: var(--accent); }
+
+/* Global pause control: indigo while downloads run, orange while held; fixed width so toggling the glyph does not resize it. */
+.pause-btn { width: 32px; padding: 4px 0; font-size: 16px; line-height: 16px; color: var(--accent); border-color: var(--accent); }
+.pause-btn:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.pause-btn.paused { color: var(--warning); border-color: var(--warning); }
+.pause-btn.paused:hover:not(:disabled) { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 15%, transparent); }
 
 #target { background: var(--bg-input); border: 1px solid var(--border); padding: 6px 8px; margin-bottom: 8px; }
 #target .targetrow { display: flex; align-items: baseline; gap: 6px; }

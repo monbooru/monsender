@@ -4,6 +4,7 @@
   const $ = (id) => document.getElementById(id);
   let cfg = { baseUrl: '', token: '' };
   let activeUrl = '';
+  let paused = false;
   // The resting result line; hovering a queue row shows that job's message and
   // reverts to this on leave.
   let baseResult = { text: '', tone: '' };
@@ -22,6 +23,27 @@
     r.textContent = text || '';
     r.title = text || ''; // result is single-line + ellipsized; show the full text on hover
     r.className = 'result' + (tone ? ' tone-' + tone : '');
+  }
+
+  // The pause button mirrors monloader's global hold: indigo while downloads
+  // run, orange while held. It shows only when monloader is reachable.
+  function setPause(isPaused) {
+    paused = isPaused;
+    const b = $('pause');
+    b.hidden = false;
+    b.classList.toggle('paused', isPaused);
+    b.textContent = isPaused ? '\u25B6\uFE0E' : '\u23F8\uFE0E';
+    b.setAttribute('aria-label', isPaused ? 'resume downloads' : 'pause downloads');
+    b.title = isPaused ? 'downloads paused - click to resume' : 'pause new downloads';
+  }
+  function hidePause() { $('pause').hidden = true; }
+
+  async function togglePause() {
+    const b = $('pause');
+    b.disabled = true;
+    await (paused ? api.resume(cfg) : api.pause(cfg)).catch(() => {});
+    b.disabled = false;
+    poll();
   }
 
   function hostShort(u) {
@@ -120,9 +142,11 @@
     const st = outcome.connState(r, r);
     setConn(st, st === 'ok' ? 'connected' : (st === 'rejected' ? 'token rejected' : 'unreachable'));
     if (r.ok && r.data && Array.isArray(r.data.jobs)) {
+      setPause(!!r.data.paused);
       const mine = new Set(await storage.getRecentJobIds());
       renderQueue(r.data.jobs, mine);
     } else {
+      hidePause();
       queueState(st === 'rejected' ? 'monloader rejected the token' : 'cannot reach monloader');
     }
     // The row nodes are rebuilt each poll, so a row hovered across a rebuild
@@ -261,6 +285,7 @@
   $('send').addEventListener('click', doSend);
   $('scan').addEventListener('click', doScan);
   $('options').addEventListener('click', () => { browser.runtime.openOptionsPage(); window.close(); });
+  $('pause').addEventListener('click', togglePause);
   $('brand').addEventListener('click', openQueue);
   $('brand').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQueue(); } });
   $('clearQueue').addEventListener('click', clearQueue);

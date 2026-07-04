@@ -1,7 +1,10 @@
 # Changelog
 
-## [v1.2.0] - 2026-07-01
+## [v1.2.1] - 2026-07-04
+### Added
+- Popup button to pause and resume monloader's downloads.
 
+## [v1.2.0] - 2026-07-01
 This update include a breaking change with the monloader pairing mechanism. Update monloader to >v1.2.0 and use the pairing mechanism.
 
 ### Added

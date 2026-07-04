@@ -106,6 +106,16 @@
     return req(base(cfg) + '/api/v1/queue/' + id, { method: 'DELETE', headers: headers(cfg, false) });
   }
 
+  // pause/resume the global download hold. The paused state is read back from
+  // listQueue's `paused`, so the popup needs no extra poll.
+  async function pause(cfg) {
+    return req(base(cfg) + '/api/v1/queue/pause', { method: 'POST', headers: headers(cfg, false) });
+  }
+
+  async function resume(cfg) {
+    return req(base(cfg) + '/api/v1/queue/resume', { method: 'POST', headers: headers(cfg, false) });
+  }
+
   async function health(cfg) {
     return req(base(cfg) + '/health', { headers: {} });
   }
@@ -130,5 +140,5 @@
     return req(base(cfg) + '/api/v1/pair/status?id=' + encodeURIComponent(id), { headers: {} });
   }
 
-  return { enqueue, enqueueBatch, listQueue, retry, continueJob, continueAll, remove, health, listSites, pair, pairStatus };
+  return { enqueue, enqueueBatch, listQueue, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus };
 });
