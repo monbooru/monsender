@@ -1,1 +1,1 @@
-https://github.com/leqwin/monsender
+https://github.com/monbooru/monsender

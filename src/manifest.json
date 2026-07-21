@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "monsender",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Send the current page or its images to your monloader download queue.",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],

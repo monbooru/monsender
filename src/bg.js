@@ -126,14 +126,18 @@ function setupMenus() {
 browser.runtime.onInstalled.addListener(setupMenus);
 browser.runtime.onStartup.addListener(setupMenus);
 
-// A direct-file link classifies as 'image', not 'supported', so it loses to the
-// page - the raw file never wins over the post URL that would carry tags. When
-// monloader is unset or the sites list is undecidable, fall through to the
-// pointed file, which is always sendable.
+// Prefer a linked post, then the page, over the raw file, which carries no tags.
+// A file link ('image') and a positively unlisted host ('unknown') lose to the
+// file; a 'blind' result (no sites list) does not - if the page is a booru its
+// file is likely an unfetchable CDN link, and if not, monloader judges it. With
+// monloader unset or nothing better pointed at, the raw file.
 async function resolveMenuTarget(cfg, info) {
   if (cfg.baseUrl) {
-    if (info.linkUrl && (await ML.sites.sendKind(cfg, info.linkUrl)) === 'supported') return info.linkUrl;
-    if (info.pageUrl && (await ML.sites.sendKind(cfg, info.pageUrl)) === 'supported') return info.pageUrl;
+    for (const cand of [info.linkUrl, info.pageUrl]) {
+      if (!cand) continue;
+      const kind = await ML.sites.sendKind(cfg, cand);
+      if (kind === 'supported' || kind === 'blind') return cand;
+    }
   }
   return info.srcUrl;
 }

@@ -1,6 +1,6 @@
 # monsender
 
-A small firefox or chrome extension for [monloader](https://github.com/leqwin/monloader). 
+A small firefox or chrome extension for [monloader](https://github.com/monbooru/monloader). 
 It sends the page you are looking at, a right-clicked image or video, or images you pick from a page scan to your monloader download queue, which pushes them into monbooru.
 
 ## Features
@@ -17,14 +17,19 @@ monsender is a companion browser extension for monloader. It hands the page you'
 ```mermaid
 flowchart LR
     web["- Any booru or gallery supported by gallery-dl<br/>- Direct image URL"]
+    ptr["Hydrus<br/>Public Tag Repository"]
     sender(["<b>monsender</b><br/>browser extension"])
     loader["<b>monloader</b><br/>downloader"]
     booru["<b>monbooru</b><br/>Your self-hosted booru"]
 
     web -->|browse| sender
-    sender -->|REST API| loader
-    web -.->|paste URL| loader
-    loader -->|REST API| booru
+    sender -->|send URL| loader
+    web -->|paste URL| loader
+    loader -->|push images, tags, source| booru
+
+    booru -.->|lookup by hash| loader
+    loader -.->|reverse lookup: md5 + similarity| web
+    ptr <-.->|"sync: sha256 tags + aliases + implications<br/>contribute back (planned)"| loader
 
     classDef hub  fill:#5c6bc0,stroke:#9fa8da,stroke-width:3px,color:#ffffff;
     classDef tool fill:#16161c,stroke:#5c6bc0,stroke-width:1.5px,color:#c8c8c8;
@@ -32,12 +37,12 @@ flowchart LR
 
     class sender hub;
     class loader,booru tool;
-    class web src;
+    class web,ptr src;
 ```
 
 - **monsender** : this application; sends the URL of the page you're currently browsing to monloader.
-- **[monloader](https://github.com/leqwin/monloader)** : downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API.
-- **[monbooru](https://github.com/leqwin/monbooru)** : self-hosted booru; organizes, tags, and serves your collection.
+- **[monloader](https://github.com/monbooru/monloader)** : downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API; also answers monbooru's reverse lookups (boorus, IQDB/SauceNAO, Hydrus PTR) and source refetches.
+- **[monbooru](https://github.com/monbooru/monbooru)** : self-hosted booru; organizes, tags, and serves your collection.
 
 ## Permissions
 
@@ -50,7 +55,9 @@ runtime when you save settings.
 
 <a href="https://addons.mozilla.org/en-US/firefox/addon/monsender/"><img alt="Get the Add-on" height="48" src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg"></a>
 
-Open the extension's options and set your monloader URL and token.
+Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> monsender** (needs monloader v1.2.0 or newer).
+
+See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help.
 
 ## Build
 

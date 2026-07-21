@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.2.2] - 2026-07-21
+### Added
+- Help link in the options page, pointing at the monsender documentation.
+### Fixed
+- Right-click sends the post, not the raw image file, when monloader's site list is unreachable.
+- Pairing prompt now points at monloader's monsender settings, where you approve the request.
+
 ## [v1.2.1] - 2026-07-04
 ### Added
 - Popup button to pause and resume monloader's downloads.

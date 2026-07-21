@@ -109,7 +109,7 @@
       setFlash((r.data && r.data.error) || (r.networkError ? 'monloader unreachable' : 'pairing request failed'), 'flash-err');
       return;
     }
-    setFlash('approve the request in monloader (settings → authentication), waiting...', 'flash-warn');
+    setFlash('approve the request in monloader (settings -> monsender), waiting...', 'flash-warn');
     const id = r.data.request_id;
     for (let i = 0; i < 60; i++) {
       await sleep(1500);

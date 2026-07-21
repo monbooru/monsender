@@ -1,6 +1,6 @@
 {
   "name": "monsender",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Send the current page or its images to your monloader download queue.",
   "private": true,
   "type": "commonjs",
@@ -24,6 +24,6 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/leqwin/monsender"
+    "url": "https://github.com/monbooru/monsender"
   }
 }

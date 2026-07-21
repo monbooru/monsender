@@ -45,7 +45,9 @@
     const r = await api.listSites(cfg);
     const data = (r && r.ok && r.data) || {};
     const sites = Array.isArray(data) ? data : (data.sites || []);
-    listCache = { baseUrl, at: now, sites };
+    // A failed or empty fetch is not cached, so a transient miss does not stick
+    // for the TTL and blind every send in that window.
+    if (sites.length) listCache = { baseUrl, at: now, sites };
     return sites;
   }
 
@@ -54,17 +56,17 @@
     return matchHost(await fetchSites(cfg), url);
   }
 
-  // Classify a URL for the popup send gate: 'image' (a direct file, no tags),
+  // Classify a URL for the send gate: 'image' (a direct file, no tags),
   // 'supported' (an example host matched, so tags come), 'unsupported' (no host
-  // at all - nothing to enqueue), or 'unknown'. A host that matches no example
-  // is 'unknown', not 'unsupported': an extractor can cover hosts its single
-  // example does not name, so support is undecidable - leave it to the job
-  // outcome rather than block on a guess.
+  // at all - nothing to enqueue), 'blind' (no sites list to consult), or
+  // 'unknown' (a fetched list that just does not name the host). 'unknown' and
+  // 'blind' are both undecidable, but callers treat them apart: an unlisted host
+  // loses to the raw file, a blind one does not.
   async function sendKind(cfg, url) {
     if (urls.isImageUrl(url)) return 'image';
     if (!hostOf(url)) return 'unsupported';
     const list = await fetchSites(cfg);
-    if (!list.length) return 'unknown';
+    if (!list.length) return 'blind';
     return matchHost(list, url) ? 'supported' : 'unknown';
   }
 
