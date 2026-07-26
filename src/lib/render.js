@@ -5,6 +5,9 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
+  const node = typeof module !== 'undefined' && module.exports;
+  const ui = node ? require('./ui.js') : (self.ML && self.ML.ui);
+
   // Build a chooser card for one scan result. The preview is an <img>, or a
   // muted <video> for a video file; the URL is set with setAttribute and
   // scanned strings via textContent, never innerHTML, so a hostile scan string
@@ -18,9 +21,7 @@
     if (/^data:/i.test(u)) return 'data: (inline)';
     try {
       const x = new URL(u);
-      const parts = x.pathname.split('/').filter(Boolean);
-      const last = parts.length ? parts[parts.length - 1] : x.hostname;
-      return x.hostname.replace(/^www\./, '') + '/.../' + last;
+      return x.hostname.replace(/^www\./, '') + '/.../' + (fileName(u) || x.hostname);
     } catch (e) { return String(u).slice(0, 64); }
   }
 
@@ -59,13 +60,35 @@
     return m ? +m[1] : 0;
   }
 
-  function placeholderText(item) { return trimName(fileName(item.url)) || kindLabel(item.kind); }
+  function placeholderText(url, kind) { return trimName(fileName(url)) || kindLabel(kind); }
+
+  // The resolution the grid loads: the narrowest the item advertises, so a
+  // hundred-post gallery does not pull a hundred originals off third-party
+  // CDNs. The pick and the send target stay item.url.
+  function previewUrl(item) {
+    let best = null;
+    for (const v of item.variants || []) if (v.w && (!best || v.w < best.w)) best = v;
+    return best ? best.url : item.url;
+  }
+
+  // loading="lazy" holds an <img> back until it scrolls in; a <video> ignores
+  // it, so hold its src instead. Without an observer the load stays eager,
+  // which is the safe direction.
+  function whenVisible(doc, el, fn) {
+    const IO = doc.defaultView && doc.defaultView.IntersectionObserver;
+    if (!IO) { fn(); return; }
+    const io = new IO((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); fn(); }
+    });
+    io.observe(el);
+  }
 
   // The no-preview tile: the (trimmed) file name, prefixed with a "preview
   // blocked" note when a load failed, so a host that blocks hotlinking reads
-  // differently from previews being turned off. textContent only, so a scanned
-  // name can never become markup.
-  function fillNoPreview(doc, thumb, item, blocked) {
+  // differently from previews being turned off. It names the picked URL, since
+  // that is what the card will send. textContent only, so a scanned name can
+  // never become markup.
+  function fillNoPreview(doc, thumb, url, kind, blocked) {
     thumb.textContent = '';
     thumb.classList.add('noimg');
     if (blocked) {
@@ -77,7 +100,7 @@
     }
     const name = doc.createElement('div');
     name.className = 'phname';
-    name.textContent = placeholderText(item);
+    name.textContent = placeholderText(url, kind);
     thumb.appendChild(name);
   }
 
@@ -111,34 +134,47 @@
 
     const thumb = doc.createElement('div');
     thumb.className = 'thumb';
-    let media = null;
     let activeSize = null;
+    let activeUrl = item.url;
+    let shownUrl = null;
     function onLoad(w, h) {
+      // Both readings describe the picked file, so a thumbnail of some other
+      // resolution says nothing about them.
+      if (shownUrl !== activeUrl) return;
       showDims(w, h);
       // The loaded width is authoritative, so a no-descriptor src stops reading
       // "src" and shows its real resolution like the rest.
       if (activeSize && w) activeSize.textContent = w + 'w';
     }
-    if (opts.previews) {
+
+    // A failed load replaces the media element with the placeholder, so a later
+    // resolution pick has to rebuild the tile rather than repoint a node that is
+    // no longer in the tree.
+    function fillThumb(url) {
+      shownUrl = url;
+      if (!opts.previews) { fillNoPreview(doc, thumb, url, item.kind, false); return; }
+      thumb.textContent = '';
+      thumb.classList.remove('noimg', 'blocked');
       const video = item.kind === 'video';
-      media = doc.createElement(video ? 'video' : 'img');
+      const el = doc.createElement(video ? 'video' : 'img');
       if (video) {
-        media.muted = true;
-        media.setAttribute('preload', 'metadata');
+        el.muted = true;
+        el.setAttribute('preload', 'metadata');
       } else {
-        media.setAttribute('loading', 'lazy');
-        media.setAttribute('referrerpolicy', 'no-referrer');
-        media.setAttribute('alt', '');
-        media.addEventListener('load', () => onLoad(media.naturalWidth, media.naturalHeight));
+        el.setAttribute('loading', 'lazy');
+        el.setAttribute('referrerpolicy', 'no-referrer');
+        el.setAttribute('alt', '');
+        el.addEventListener('load', () => onLoad(el.naturalWidth, el.naturalHeight));
       }
       // A hotlink-protected, stale, or undecodable URL leaves a blank tile; show
       // it as blocked so the user sees why the preview is missing.
-      media.addEventListener('error', () => fillNoPreview(doc, thumb, item, true));
-      media.setAttribute('src', item.url); // setAttribute, not innerHTML: never parsed as markup
-      thumb.appendChild(media);
-    } else {
-      fillNoPreview(doc, thumb, item, false);
+      el.addEventListener('error', () => fillNoPreview(doc, thumb, activeUrl, item.kind, true));
+      thumb.appendChild(el);
+      // setAttribute, not innerHTML: never parsed as markup.
+      if (video) whenVisible(doc, el, () => el.setAttribute('src', url));
+      else el.setAttribute('src', url);
     }
+    fillThumb(previewUrl(item));
 
     const meta = doc.createElement('div');
     meta.className = 'meta nowrap';
@@ -175,12 +211,10 @@
         cb.setAttribute('data-url', u);
         cb.value = u;
         ext = fileExt(u);
-        if (media) media.setAttribute('src', u);
+        activeUrl = u;
+        fillThumb(u);
       };
-      tokens.forEach((t) => {
-        t.addEventListener('click', () => activate(t));
-        t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(t); } });
-      });
+      tokens.forEach((t) => ui.onActivate(t, () => activate(t)));
       const def = tokens.find((t) => t.getAttribute('data-url') === item.url) || tokens[0];
       def.classList.add('active');
       activeSize = def;
@@ -189,5 +223,5 @@
     return card;
   }
 
-  return { imageCard, shortUrl };
+  return { imageCard };
 });

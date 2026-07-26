@@ -17,12 +17,17 @@
     return h;
   }
 
+  // A monloader that accepts the connection and never answers would otherwise
+  // leave every call pending forever - the server-side ?wait bounds the job,
+  // not the socket. Above the 60 s ceiling settings allow for ?wait.
+  const TIMEOUT_MS = 75000;
+
   // Uniform result. A network failure (monloader unreachable) is status 0 with
   // networkError, never a throw, so callers branch on one shape.
   async function req(url, init) {
     let res;
     try {
-      res = await fetch(url, init);
+      res = await fetch(url, Object.assign({ signal: AbortSignal.timeout(TIMEOUT_MS) }, init));
     } catch (e) {
       return { ok: false, status: 0, networkError: true, error: String((e && e.message) || e), data: null, headers: null };
     }
@@ -39,23 +44,23 @@
     opts = opts || {};
     const wait = opts.wait > 0 ? '?wait=' + opts.wait : '';
     const body = { url };
-    if (opts.options && hasOptions(opts.options)) body.options = cleanOptions(opts.options);
+    const o = opts.options && cleanOptions(opts.options);
+    if (o && Object.keys(o).length) body.options = o;
     return req(base(cfg) + '/api/v1/queue' + wait, {
       method: 'POST', headers: headers(cfg, true), body: JSON.stringify(body)
     });
   }
 
-  function hasOptions(o) {
-    return !!(o && (o.gallery || o.folder || o.poolMode || o.pool_mode || o.maxItems || o.max_items));
-  }
+  // Only the keys monloader's enqueue accepts survive; an unknown or empty
+  // option is dropped rather than sent.
   function cleanOptions(o) {
     const out = {};
     if (o.gallery) out.gallery = o.gallery;
     if (o.folder) out.folder = o.folder;
-    const pm = o.poolMode || o.pool_mode;
-    if (pm) out.pool_mode = pm;
     const mi = o.maxItems || o.max_items;
     if (mi) out.max_items = Number(mi);
+    const pu = o.pageUrl || o.page_url;
+    if (pu) out.page_url = pu;
     return out;
   }
 

@@ -9,6 +9,7 @@
     header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     header strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
     header .help-link { margin-left: auto; }
+    .tokenstate { margin-left: 12px; }
   </style>
 </head>
 <body>
@@ -30,6 +31,7 @@
       <button id="save" type="button">save</button>
     </div>
     <span id="conn" class="conn"></span>
+    <span id="tokenState" class="muted small tokenstate"></span>
     <div id="flash"></div>
   </div>
 
@@ -62,6 +64,7 @@
   <script src="../lib/perms.js"></script>
   <script src="../lib/api.js"></script>
   <script src="../lib/outcome.js"></script>
+  <script src="../lib/ui.js"></script>
   <script src="../lib/urls.js"></script>
   <script src="options.js"></script>
 </body>

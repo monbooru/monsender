@@ -1,5 +1,23 @@
 # Changelog
 
+## [v1.3.0] - 2026-07-26
+### Added
+- Right-click send now offers a toast to narrow the send to the pointed image. ([#3](https://github.com/monbooru/monsender/issues/3))
+### Changed
+- Direct file sends carry the page URL, recorded as the item's source. ([#3](https://github.com/monbooru/monsender/issues/3))
+- Chooser thumbnails load the smallest advertised variant; videos load only once visible.
+- The supported site list is cached, so the first send after idle no longer waits on it.
+### Fixed
+- Batch sends from the chooser now say why they failed, not just a count.
+- A revoked host permission is reported as such, not as a connection failure.
+- Test connection pairs the token only with the saved origin and refuses malformed URLs.
+- The chooser says when a page could not be scanned instead of "no images found".
+- Scans keep lazy-loaded images whose real size is only advertised in srcset.
+- The chooser and popup no longer offer file types monloader declines.
+- Picking another resolution after a blocked preview restores the preview.
+
+Thanks to @gary-host-laptop for the suggestions (https://github.com/monbooru/monsender/issues/3)
+
 ## [v1.2.2] - 2026-07-21
 ### Added
 - Help link in the options page, pointing at the monsender documentation.

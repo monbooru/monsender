@@ -25,9 +25,8 @@
   }
 
   function firstItemField(job, field) {
-    const items = (job && job.items) || [];
-    for (const it of items) if (it && it[field]) return it[field];
-    return null;
+    const hit = ((job && job.items) || []).find((it) => it && it[field]);
+    return hit ? hit[field] : null;
   }
 
   // Map a resolved single-send job to one line. job === null means
@@ -66,29 +65,21 @@
     return moved + '/' + items.length;
   }
 
+  // monloader's summary counts, in the order a row shows them. Both the row
+  // text and the series sum read this, so they cannot drift apart.
+  const COUNT_LABELS = { created: 'new', duplicate: 'dup', skipped: 'skip', failed: 'fail', canceled: 'cancel' };
+
   // Terse per-row counts for a finished queue job: every nonzero outcome,
   // so an all-skipped or partly-canceled job is not blank.
   function queueSummary(job) {
     const s = (job && job.summary) || {};
-    const parts = [];
-    if (s.created) parts.push(s.created + ' new');
-    if (s.duplicate) parts.push(s.duplicate + ' dup');
-    if (s.skipped) parts.push(s.skipped + ' skip');
-    if (s.failed) parts.push(s.failed + ' fail');
-    if (s.canceled) parts.push(s.canceled + ' cancel');
-    return parts.join(' ');
+    return Object.keys(COUNT_LABELS).filter((k) => s[k]).map((k) => s[k] + ' ' + COUNT_LABELS[k]).join(' ');
   }
 
   function addSummary(a, b) {
-    a = a || {}; b = b || {};
-    return {
-      created: (a.created || 0) + (b.created || 0),
-      duplicate: (a.duplicate || 0) + (b.duplicate || 0),
-      skipped: (a.skipped || 0) + (b.skipped || 0),
-      failed: (a.failed || 0) + (b.failed || 0),
-      canceled: (a.canceled || 0) + (b.canceled || 0),
-      total: (a.total || 0) + (b.total || 0)
-    };
+    const out = {};
+    for (const k of [...Object.keys(COUNT_LABELS), 'total']) out[k] = ((a && a[k]) || 0) + ((b && b[k]) || 0);
+    return out;
   }
 
   // Collapse a continue-series (a capped search and its continuations, which

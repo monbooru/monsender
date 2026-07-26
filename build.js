@@ -98,4 +98,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildManifest, readVersion, build, TARGETS };
+module.exports = { buildManifest };

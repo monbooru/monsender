@@ -1,7 +1,7 @@
 'use strict';
 (function () {
-  const { storage, api, outcome, sites, send } = self.ML;
-  const $ = (id) => document.getElementById(id);
+  const { storage, api, outcome, perms, sites, send, ui } = self.ML;
+  const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
   let activeUrl = '';
   let paused = false;
@@ -9,15 +9,8 @@
   // reverts to this on leave.
   let baseResult = { text: '', tone: '' };
 
-  function setConn(state, label) {
-    const c = $('conn');
-    c.textContent = '';
-    const d = document.createElement('span');
-    d.className = 'dot dot-' + state;
-    const t = document.createElement('span');
-    t.textContent = ' ' + label;
-    c.appendChild(d); c.appendChild(t);
-  }
+  const setConn = (state, label) => ui.setConn($('conn'), state, label);
+
   function setResult(text, tone) {
     const r = $('result');
     r.textContent = text || '';
@@ -46,13 +39,9 @@
     poll();
   }
 
-  function hostShort(u) {
-    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u || ''; }
-  }
-
   async function init() {
     const s = await storage.getSettings();
-    cfg = { baseUrl: s.baseUrl, token: s.token };
+    cfg = send.cfgOf(s);
     // Clear the badge and the tooltip a no-popup send may have set. The result
     // line starts empty; a queue job's outcome shows only while its row is
     // hovered, or this popup's own send result.
@@ -74,32 +63,37 @@
       queueState('set a monloader URL in options');
       return;
     }
-    refreshConn();
+    // Without the optional host permission every fetch fails as a network
+    // error, which reads as "monloader is down" when the fix is one click in
+    // options.
+    if (!(await perms.hasOrigin(cfg.baseUrl))) {
+      setConn('down', 'host access not granted');
+      $('hint').textContent = 'open options and save to allow access to ' + cfg.baseUrl;
+      $('send').disabled = true;
+      queueState('host access not granted');
+      return;
+    }
+    setConn('checking', 'checking');
     hint();
-    startPolling();
+    poll();
   }
+
+  const HINT = {
+    supported: 'booru - tags will be included',
+    image: 'direct image - no tags',
+    unsupported: 'not a supported site or image'
+  };
 
   async function hint() {
     $('scan').disabled = !activeUrl;
     if (!activeUrl) { $('hint').textContent = ''; $('send').disabled = true; return; }
     let kind;
     try { kind = await sites.sendKind(cfg, activeUrl); } catch (e) { kind = 'unknown'; }
-    if (kind === 'supported') $('hint').textContent = 'booru - tags will be included';
-    else if (kind === 'image') $('hint').textContent = 'direct image - no tags';
-    else if (kind === 'unsupported') $('hint').textContent = 'not a supported site or image';
-    else $('hint').textContent = '';
+    // An undecidable kind ('unknown', 'blind') says nothing worth showing.
+    $('hint').textContent = HINT[kind] || '';
     // Block the send only when sure it is unsendable; an undecidable result
     // (the sites list could not be fetched) leaves it enabled.
     $('send').disabled = kind === 'unsupported';
-  }
-
-  async function refreshConn() {
-    setConn('checking', 'checking');
-    const h = await api.health(cfg);
-    // Always probe the authed endpoint - monloader may require a token we lack.
-    const authed = await api.listQueue(cfg, { limit: 1 });
-    const st = outcome.connState(h, authed);
-    setConn(st, st === 'ok' ? 'connected' : (st === 'rejected' ? 'token rejected' : 'unreachable'));
   }
 
   async function doSend() {
@@ -109,7 +103,6 @@
     if (!out.configured) { setResult('set monloader URL in options', 'error'); return; }
     setResult(out.outcome.text, out.outcome.tone);
     baseResult = { text: out.outcome.text, tone: out.outcome.tone };
-    await storage.setLastResult(out.outcome);
     if (out.jobId) await storage.addRecentJobIds([out.jobId]);
     poll();
   }
@@ -134,24 +127,31 @@
     window.close();
   }
 
+  // Chain each poll off the end of the last rather than on a fixed interval:
+  // against a monloader that answers slowly, an interval stacks calls faster
+  // than they come back.
   let pollTimer = null;
-  function startPolling() { poll(); pollTimer = setInterval(poll, 2000); }
 
   async function poll() {
-    const r = await api.listQueue(cfg, { limit: 8 });
-    const st = outcome.connState(r, r);
-    setConn(st, st === 'ok' ? 'connected' : (st === 'rejected' ? 'token rejected' : 'unreachable'));
-    if (r.ok && r.data && Array.isArray(r.data.jobs)) {
-      setPause(!!r.data.paused);
-      const mine = new Set(await storage.getRecentJobIds());
-      renderQueue(r.data.jobs, mine);
-    } else {
-      hidePause();
-      queueState(st === 'rejected' ? 'monloader rejected the token' : 'cannot reach monloader');
+    clearTimeout(pollTimer);
+    try {
+      const r = await api.listQueue(cfg, { limit: 8 });
+      const st = outcome.connState(r, r);
+      setConn(st, ui.connLabel(st));
+      if (r.ok && r.data && Array.isArray(r.data.jobs)) {
+        setPause(!!r.data.paused);
+        const mine = new Set(await storage.getRecentJobIds());
+        renderQueue(r.data.jobs, mine);
+      } else {
+        hidePause();
+        queueState(st === 'rejected' ? 'monloader rejected the token' : 'cannot reach monloader');
+      }
+      // The row nodes are rebuilt each poll, so a row hovered across a rebuild
+      // fires no mouseleave; revert the result line unless a row is still hovered.
+      if (!document.querySelector('.qrow:hover')) setResult(baseResult.text, baseResult.tone);
+    } finally {
+      pollTimer = setTimeout(poll, 2000);
     }
-    // The row nodes are rebuilt each poll, so a row hovered across a rebuild
-    // fires no mouseleave; revert the result line unless a row is still hovered.
-    if (!document.querySelector('.qrow:hover')) setResult(baseResult.text, baseResult.tone);
   }
 
   function summaryText(j) {
@@ -183,8 +183,7 @@
     s.title = title;
     s.tabIndex = 0;
     s.setAttribute('role', 'button');
-    s.addEventListener('click', fn);
-    s.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+    ui.onActivate(s, fn);
     return s;
   }
 
@@ -227,11 +226,7 @@
     setClearEnabled(false);
   }
 
-  function setClearEnabled(on) {
-    const c = $('clearQueue');
-    c.classList.toggle('disabled', !on);
-    c.setAttribute('aria-disabled', String(!on));
-  }
+  function setClearEnabled(on) { ui.setActionEnabled($('clearQueue'), on); }
 
   function renderQueue(jobs, mine) {
     const groups = outcome.groupSeries(jobs);
@@ -248,7 +243,7 @@
       st.textContent = j.status;
       const site = document.createElement('span');
       site.className = 'qsite';
-      site.textContent = (j.site || hostShort(j.url)) + (j.gallery ? ' / ' + j.gallery : '');
+      site.textContent = (j.site || sites.hostOf(j.url)) + (j.gallery ? ' / ' + j.gallery : '');
       site.title = j.url || '';
       const sum = document.createElement('span');
       sum.className = 'qsum';
@@ -269,27 +264,28 @@
   // loop DELETE; running and queued jobs are left alone, matching monloader's
   // own queue "clear".
   async function clearQueue() {
-    if ($('clearQueue').getAttribute('aria-disabled') === 'true') return;
+    setClearEnabled(false); // a long clear would otherwise take a second click
     const r = await api.listQueue(cfg, { limit: 200 });
-    if (!(r.ok && r.data && Array.isArray(r.data.jobs))) return;
-    for (const j of r.data.jobs) { if (finished(j)) { try { await api.remove(cfg, j.id); } catch (e) {} } }
+    const done = (r.ok && r.data && Array.isArray(r.data.jobs)) ? r.data.jobs.filter(finished) : [];
+    const prev = baseResult;
+    for (let i = 0; i < done.length; i++) {
+      // The poll rewrites the result line every 2 s, so progress has to be the
+      // resting text rather than a one-shot message.
+      baseResult = { text: 'clearing ' + (i + 1) + ' of ' + done.length + '...', tone: 'dim' };
+      setResult(baseResult.text, baseResult.tone);
+      try { await api.remove(cfg, done[i].id); } catch (e) {}
+    }
+    baseResult = prev;
+    setResult(prev.text, prev.tone);
     poll();
-  }
-
-  function openQueue() {
-    if (!cfg.baseUrl) return;
-    browser.tabs.create({ url: cfg.baseUrl + '/queue' });
-    window.close();
   }
 
   $('send').addEventListener('click', doSend);
   $('scan').addEventListener('click', doScan);
   $('options').addEventListener('click', () => { browser.runtime.openOptionsPage(); window.close(); });
   $('pause').addEventListener('click', togglePause);
-  $('brand').addEventListener('click', openQueue);
-  $('brand').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQueue(); } });
-  $('clearQueue').addEventListener('click', clearQueue);
-  $('clearQueue').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clearQueue(); } });
+  ui.onActivate($('brand'), () => ui.openQueue(cfg, true));
+  ui.onActivate($('clearQueue'), clearQueue);
 
   init();
 })();

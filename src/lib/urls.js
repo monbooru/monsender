@@ -12,8 +12,10 @@
 
   // A direct link to an image file: http(s) whose path ends in a known image
   // extension. The query/fragment is ignored (a page is not an image because
-  // its query happens to name one).
-  const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i;
+  // its query happens to name one). Only the types monbooru ingests count -
+  // monloader declines an svg, avif, or bmp media URL up front, so calling one
+  // a sendable direct file would promise a send that cannot land.
+  const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
   function isImageUrl(url) {
     try {
       const u = new URL(url);
@@ -30,5 +32,12 @@
     return u.replace(/\/+$/, '');
   }
 
-  return { isImageUrl, normalizeUrl };
+  // Normalizing only prefixes a scheme and trims slashes, so it happily returns
+  // strings nothing can reach: "http://" and "http://not a url" both come back
+  // and both throw in new URL(), which is where a saved base URL ends up.
+  function isReachableBase(u) {
+    try { return !!new URL(u).host; } catch (e) { return false; }
+  }
+
+  return { isImageUrl, normalizeUrl, isReachableBase };
 });

@@ -51,18 +51,17 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 .nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Status (job) and outcome (item) colors - same vocabulary as monloader. */
-.st-queued, .st-running, .o-queued, .tone-accent { color: var(--accent); }
-.st-succeeded, .o-created, .tone-success { color: var(--success); }
-.st-partial, .o-capped, .tone-warning { color: var(--warning); }
-.st-failed, .o-failed, .tone-error { color: var(--error); }
-.st-canceled, .o-duplicate, .o-skipped_archive, .o-skipped, .o-canceled, .tone-dim { color: var(--fg-dim); }
+.st-queued, .st-running, .tone-accent { color: var(--accent); }
+.st-succeeded, .tone-success { color: var(--success); }
+.st-partial, .tone-warning { color: var(--warning); }
+.st-failed, .tone-error { color: var(--error); }
+.st-canceled, .tone-dim { color: var(--fg-dim); }
 
 .flash { padding: 4px 8px; margin: 6px 0; border: 1px solid; font-size: 13px; }
 .flash-ok { color: var(--success); border-color: var(--success); }
 .flash-err { color: var(--error); border-color: var(--error); }
 .flash-warn { color: var(--warning); border-color: var(--warning); }
 
-.badge { padding: 0 4px; border: 1px solid var(--border); font-size: 11px; }
 
 .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-dim); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }

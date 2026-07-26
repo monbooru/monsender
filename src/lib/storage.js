@@ -63,16 +63,17 @@
     return r.lastScan || null;
   }
 
-  // The outcome of the most recent send, recorded for reference; a no-popup
-  // send also surfaces it live through the action badge color.
-  async function setLastResult(r) { await sessionArea().set({ lastResult: r }); }
-  async function getLastResult() {
-    const r = await sessionArea().get('lastResult');
-    return r.lastResult || null;
+  // The gallery-dl site list. It is the largest response the extension fetches
+  // and most gestures consult it, so it outlives the module that holds it: the
+  // MV3 worker is torn down between gestures and the popup dies on close.
+  async function setSitesCache(v) { await sessionArea().set({ sitesCache: v }); }
+  async function getSitesCache() {
+    const r = await sessionArea().get('sitesCache');
+    return r.sitesCache || null;
   }
 
   return {
-    DEFAULTS, getSettings, setSettings, getRecentJobIds, addRecentJobIds,
-    setScan, getScan, setLastResult, getLastResult
+    getSettings, setSettings, getRecentJobIds, addRecentJobIds,
+    setScan, getScan, setSitesCache, getSitesCache
   };
 });

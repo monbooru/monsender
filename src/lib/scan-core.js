@@ -21,24 +21,32 @@
     }).filter((c) => c.url);
   }
 
-  // The largest variant the element offers: a srcset entry wider than the
-  // rendered image, else the full src, else what the browser loaded.
-  function bestUrl(n) {
-    let best = null, bv = n.naturalWidth || 0;
-    if (n.srcset) for (const c of srcsetCands(n.srcset)) {
-      if (c.w > bv) { bv = c.w; best = c.url; }
-    }
-    return best || n.src || n.currentSrc;
-  }
-
   // Every distinct resolution the element advertises (srcset entries + src), so
-  // the chooser can offer a smaller one. The largest stays the default (bestUrl).
+  // the chooser can offer a smaller one. The largest stays the default
+  // (bestCand). Inside a <picture> the sibling <source> candidates describe the
+  // same image, so they ride along here instead of becoming cards of their own.
   function variantsOf(n) {
     const cands = n.srcset ? srcsetCands(n.srcset) : [];
     if (n.src) cands.push({ url: n.src, w: 0 });
     if (n.currentSrc && n.currentSrc !== n.src) cands.push({ url: n.currentSrc, w: 0 });
+    const p = n.parentNode;
+    if (p && p.nodeName === 'PICTURE') {
+      for (const s of p.children) if (s.nodeName === 'SOURCE' && s.srcset) cands.push(...srcsetCands(s.srcset));
+    }
     return cands;
   }
+
+  // The largest variant the element offers: a candidate wider than the rendered
+  // image, else the full src, else what the browser loaded. The descriptor
+  // width rides along because it describes a different file than the one the
+  // page rendered and measured.
+  function bestCand(n) {
+    let best = null, bv = n.naturalWidth || 0;
+    for (const c of variantsOf(n)) if (c.w > bv) { bv = c.w; best = c; }
+    return best || { url: n.src || n.currentSrc, w: 0 };
+  }
+
+  function bestUrl(n) { return bestCand(n).url; }
 
   // A pathological page can hold an enormous DOM; cap how many elements the
   // walk visits so the per-element getComputedStyle cannot stall the page. The
@@ -62,11 +70,12 @@
       try { return new win.URL(t, baseURI).href; } catch (e) { return null; }
     }
 
-    function add(raw, isData, tag, w, h, variants) {
+    function add(raw, isData, tag, w, h, variants, dw) {
       const t = toAbs(raw, isData);
       if (!t || seen.has(t)) return;
       seen.add(t);
       const item = { url: t, tag: tag || '', w: w || 0, h: h || 0 };
+      if (dw) item.dw = dw;
       if (variants) {
         const vs = [], vseen = new Set();
         for (const v of variants) {
@@ -80,26 +89,30 @@
       out.push(item);
     }
 
+    // Only a standalone SVG document has a URL monloader could fetch; an inline
+    // <svg> has none, so it is not collected at all.
     function svgToURL(el) {
       try {
-        if (el.ownerDocument && el.ownerDocument.contentType === 'image/svg+xml') return el.ownerDocument.URL;
-        const s = el.cloneNode(true);
-        s.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        return 'data:image/svg+xml,' + encodeURIComponent(s.outerHTML);
+        const d = el.ownerDocument;
+        return (d && d.contentType === 'image/svg+xml') ? d.URL : '';
       } catch (e) { return ''; }
     }
 
     function visit(n) {
       const nn = n.nodeName && n.nodeName.toUpperCase();
-      if (nn === 'IMG' || nn === 'SOURCE' || nn === 'VIDEO' || nn === 'PICTURE') {
+      // A <picture>'s <source> entries belong to its <img> (variantsOf folds
+      // them in), so a card each would multiply the same image.
+      const inPicture = nn === 'SOURCE' && n.parentNode && n.parentNode.nodeName === 'PICTURE';
+      if (!inPicture && (nn === 'IMG' || nn === 'SOURCE' || nn === 'VIDEO' || nn === 'PICTURE')) {
         // One card per element, defaulting to the largest variant; the other
         // resolutions ride along so the chooser can offer a smaller one.
-        add(bestUrl(n), false, nn,
+        const c = bestCand(n);
+        add(c.url, false, nn,
           n.naturalWidth || n.videoWidth || n.width, n.naturalHeight || n.videoHeight || n.height,
-          variantsOf(n));
+          variantsOf(n), c.w);
         if (n.poster) add(n.poster, false, 'IMG');
       } else if (nn === 'SVG') {
-        add(svgToURL(n), true, 'SVG');
+        add(svgToURL(n), false, 'SVG');
       } else if (nn === 'A') {
         if (n.href && urls.isImageUrl(n.href)) add(n.href, false, 'A');
       }
@@ -128,14 +141,21 @@
     return out;
   }
 
+  // The two containers monbooru takes as video, told apart from images because
+  // the chooser previews them differently.
+  const VIDEO_EXT = /\.(mp4|webm)(\?|#|$)/i;
+  // Media monloader recognizes but monbooru will not take, so the download is
+  // declined before it starts: offering one would promise a send that cannot
+  // land. A URL carrying no extension is not judged here - a CDN image often
+  // has none, and monloader is the authority on those.
+  const DECLINED_EXT = /\.(svg|avif|bmp|tiff?|heic|heif|m4v|mov|mkv|avi|ogv)(\?|#|$)/i;
+
   function classify(url) {
     if (url.startsWith('data:')) return 'data';
-    if (/^https?:/i.test(url)) {
-      if (/\.svg(\?|#|$)/i.test(url)) return 'svg';
-      if (/\.(webm|mp4|m4v|mov|mkv|avi|ogv)(\?|#|$)/i.test(url)) return 'video';
-      return 'http';
-    }
-    return 'other';
+    if (!/^https?:/i.test(url)) return 'other';
+    if (VIDEO_EXT.test(url)) return 'video';
+    if (DECLINED_EXT.test(url)) return 'declined';
+    return 'http';
   }
 
   function fetchable(url) {
@@ -159,8 +179,9 @@
     return out;
   }
 
-  // Dedupe, keep the http(s) image and video files monloader can fetch
-  // (data: and inline svg are skipped, since they have no fetchable URL), cap.
+  // Dedupe, keep the http(s) files monloader can actually land in monbooru
+  // (a data: URL has nothing to fetch; a declined container has nowhere to go),
+  // cap.
   function finalize(raw, opts) {
     opts = opts || {};
     const cap = opts.cap || 100;
@@ -172,8 +193,11 @@
       if (!url || seen.has(url)) continue;
       const kind = classify(url);
       if (kind !== 'http' && kind !== 'video') continue;
-      // drop icons/trackers when the size is known
-      if (minSize && r.w && r.h && (r.w < minSize || r.h < minSize)) continue;
+      // Drop icons/trackers when the size is known. A lazy page ships a 1x1
+      // placeholder in src and the real image in srcset, so a measured size
+      // describes a different file than the chosen URL; its advertised width
+      // is then the only size that says anything about what will be sent.
+      if (minSize && (r.dw ? r.dw < minSize : (r.w && r.h && (r.w < minSize || r.h < minSize)))) continue;
       seen.add(url);
       const item = { url, tag: (r && r.tag) || '', kind, w: (r && r.w) || 0, h: (r && r.h) || 0 };
       const variants = pickVariants(r && r.variants, url);
@@ -184,5 +208,5 @@
     return { items, total: all.length, shown: items.length, truncated: all.length > cap };
   }
 
-  return { collect, classify, finalize };
+  return { collect, finalize, bestUrl };
 });

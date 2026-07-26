@@ -1,25 +1,15 @@
 'use strict';
 (function () {
-  const { storage, api, outcome, render } = self.ML;
-  const $ = (id) => document.getElementById(id);
+  const { storage, render, send, ui } = self.ML;
+  const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
   let scan = null;
 
-  function setConn(state, label) {
-    const c = $('conn');
-    c.textContent = '';
-    const d = document.createElement('span');
-    d.className = 'dot dot-' + state;
-    const t = document.createElement('span');
-    t.textContent = ' ' + label;
-    c.appendChild(d); c.appendChild(t);
-  }
-
   async function init() {
     const s = await storage.getSettings();
-    cfg = { baseUrl: s.baseUrl, token: s.token };
+    cfg = send.cfgOf(s);
     if (!cfg.baseUrl) {
-      setConn('down', 'set monloader URL');
+      ui.setConn($('conn'), 'down', 'set monloader URL');
       $('scanhead').textContent = 'set your monloader URL in options';
       return;
     }
@@ -41,11 +31,8 @@
   }
 
   async function refreshConn() {
-    const h = await api.health(cfg);
-    // Always probe the authed endpoint - monloader may require a token we lack.
-    const authed = await api.listQueue(cfg, { limit: 1 });
-    const st = outcome.connState(h, authed);
-    setConn(st, st === 'ok' ? 'connected' : (st === 'rejected' ? 'token rejected' : 'unreachable'));
+    const { state, label } = await ui.probe(cfg);
+    ui.setConn($('conn'), state, label);
   }
 
   function renderChooser() {
@@ -60,7 +47,8 @@
       su.hidden = true;
     }
     if (!scan || !scan.items || !scan.items.length) {
-      $('scanhead').textContent = scan ? 'no images found' : 'no scan yet - start a scan from the popup';
+      $('scanhead').textContent = !scan ? 'no scan yet - start a scan from the popup'
+        : (scan.blocked ? 'this page cannot be scanned' : 'no images found');
       updateSendBtn();
       return;
     }
@@ -77,24 +65,20 @@
   function picked() {
     return Array.from(document.querySelectorAll('input.pick:checked')).map((c) => c.getAttribute('data-url'));
   }
-  function selectable() {
-    return Array.from(document.querySelectorAll('input.pick:not(:disabled)'));
+  function allPicks() {
+    return Array.from(document.querySelectorAll('input.pick'));
   }
-  function setSact(id, on) {
-    const e = $(id);
-    e.classList.toggle('disabled', !on);
-    e.setAttribute('aria-disabled', String(!on));
-  }
+  function setSact(id, on) { ui.setActionEnabled($(id), on); }
   function updateSendBtn() {
-    const sel = selectable();
-    const n = sel.filter((c) => c.checked).length;
+    const all = allPicks();
+    const n = all.filter((c) => c.checked).length;
     $('sendSel').textContent = 'send selected (' + n + ')';
     $('sendSel').disabled = n === 0;
     setSact('selNone', n > 0);
-    setSact('selAll', sel.length > 0 && n < sel.length);
+    setSact('selAll', all.length > 0 && n < all.length);
   }
   function selectAll() {
-    selectable().forEach((c) => { c.checked = true; });
+    allPicks().forEach((c) => { c.checked = true; });
     updateSendBtn();
   }
   function clearSelection() {
@@ -106,38 +90,26 @@
     if (!urls.length) return;
     $('sendSel').disabled = true;
     $('scanmsg').textContent = 'sending ' + urls.length + '...';
-    const ids = [];
-    await api.enqueueBatch(cfg, urls, {
-      onEach: (u, r) => { const id = r.data && (r.data.job_id || r.data.id); if (id) ids.push(id); }
-    });
-    if (ids.length) await storage.addRecentJobIds(ids);
-    const failed = urls.length - ids.length;
-    const msg = failed
-      ? 'sent ' + ids.length + ' of ' + urls.length + '; ' + failed + ' failed'
-      : 'sent ' + ids.length + ' to the queue';
-    const tone = failed ? (ids.length ? 'warning' : 'error') : 'dim';
+    // Scanned files carry the scanned page as their source.
+    const r = await send.sendMany(urls, { options: { pageUrl: scan && scan.url } });
+    if (!r.configured) { $('scanmsg').textContent = 'set monloader URL in options'; updateSendBtn(); return; }
+    if (r.ids.length) await storage.addRecentJobIds(r.ids);
+    // Counts alone leave a rejected token looking like N unexplained failures,
+    // so carry the first mapped reason alongside them.
+    const msg = r.failed
+      ? 'sent ' + r.ids.length + ' of ' + urls.length + '; ' + r.failed + ' failed'
+        + (r.outcome ? ' - ' + r.outcome.text : '')
+      : 'sent ' + r.ids.length + ' to the queue';
+    const tone = r.failed ? (r.ids.length ? 'warning' : 'error') : 'dim';
     $('scanmsg').textContent = msg;
-    await storage.setLastResult({ text: msg, tone });
-    if (ids.length) browser.runtime.sendMessage({ type: 'queued', count: ids.length }).catch(() => {});
+    if (r.ids.length) browser.runtime.sendMessage({ type: 'queued', count: r.ids.length }).catch(() => {});
     // Keep failed picks selected so they can be re-sent; clear only a clean run.
-    if (failed) updateSendBtn(); else clearSelection();
+    if (r.failed) updateSendBtn(); else clearSelection();
   }
 
-  function openQueue() {
-    if (cfg.baseUrl) browser.tabs.create({ url: cfg.baseUrl + '/queue' });
-  }
-
-  function onSact(id, fn) {
-    const e = $(id);
-    const go = () => { if (e.getAttribute('aria-disabled') !== 'true') fn(); };
-    e.addEventListener('click', go);
-    e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
-  }
-
-  $('brand').addEventListener('click', openQueue);
-  $('brand').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQueue(); } });
-  onSact('selAll', selectAll);
-  onSact('selNone', clearSelection);
+  ui.onActivate($('brand'), () => ui.openQueue(cfg));
+  ui.onActivate($('selAll'), selectAll);
+  ui.onActivate($('selNone'), clearSelection);
   $('sendSel').addEventListener('click', sendSelected);
   init();
 })();
