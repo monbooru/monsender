@@ -67,10 +67,6 @@ Build the per-browser bundles:
 node build.js        # writes dist/chrome and dist/firefox
 ```
 
-## Attribution and license
+## Acknowledgements
 
-monsender is licensed under **AGPL-3.0-or-later** (see `LICENSE`).
-
-The in-page image detection uses code from [ushiro](https://github.com/gary-host-laptop/ushiro) by
-**gary-host-laptop**, and [behind!](https://github.com/kubuzetto/behind) by **kubuzetto**, originally
-under MPL-2.0. The MPL-2.0 notice is preserved in `LICENSE`.
+See [monbooru's acknowledgements](https://github.com/monbooru/monbooru#acknowledgements).

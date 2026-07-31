@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.3.1] - 2026-07-31
+### Fixed
+- Right-click sends the post, not the raw file, on a supported site alias set in monloader such as *.donmai.us. ([#3](https://github.com/monbooru/monsender/issues/3))
+
+Thanks to @gary-host-laptop for the report (https://github.com/monbooru/monsender/issues/3)
+
 ## [v1.3.0] - 2026-07-26
 ### Added
 - Right-click send now offers a toast to narrow the send to the pointed image. ([#3](https://github.com/monbooru/monsender/issues/3))

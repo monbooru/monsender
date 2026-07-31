@@ -20,16 +20,17 @@
 
   // Pure: does any supported site match this URL's host? `sites` may be the
   // array or the { sites: [...] } envelope. Match the host exactly or as a
-  // subdomain of an entry's example host; a substring would let a look-alike
-  // (e621.net.evil.example) pass.
+  // subdomain of an entry's example host or hosts aliases (monloader serves
+  // a mirror like safebooru.donmai.us only there - the example names one
+  // host); a substring would let a look-alike (e621.net.evil.example) pass.
   function matchHost(sites, url) {
     const host = hostOf(url);
     if (!host) return false;
     const list = Array.isArray(sites) ? sites : (sites && sites.sites) || [];
-    return list.some((s) => {
-      const exHost = hostOf(s && s.example);
-      return !!exHost && (host === exHost || host.endsWith('.' + exHost));
-    });
+    const covers = (h) => !!h && (host === h || host.endsWith('.' + h));
+    return list.some((s) =>
+      covers(hostOf(s && s.example)) ||
+      ((s && s.hosts) || []).some((h) => covers(String(h).replace(/^www\./, ''))));
   }
 
   const TTL_MS = 5 * 60 * 1000;
