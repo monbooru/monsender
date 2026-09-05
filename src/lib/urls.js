@@ -5,6 +5,9 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
+  // Runs in the page: injected into the active tab under activeTab, so it
+  // reaches nothing privileged - no storage, no api, no token.
+
   // Shared URL classifiers. The send gate (lib/sites.js) and the page scan
   // (lib/scan-core.js) both need "is this a direct image file?", but run in
   // separate load contexts (popup, background, injected page) that share no

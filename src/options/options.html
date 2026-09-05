@@ -4,19 +4,15 @@
   <meta charset="utf-8" />
   <title>monsender settings</title>
   <link rel="stylesheet" href="../lib/ui.css" />
-  <style>
-    body { max-width: 680px; margin: 0 auto; padding: 16px; }
-    header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-    header strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
-    header .help-link { margin-left: auto; }
-    .tokenstate { margin-left: 12px; }
-  </style>
+  <link rel="stylesheet" href="options.css" />
 </head>
 <body>
   <header>
     <img src="../assets/logo.png" class="logo" alt="" />
     <strong>monsender</strong><span class="muted small">settings</span>
     <a class="muted small help-link" href="https://monbooru.github.io/mondocs/addons/monsender/index.html" target="_blank" rel="noopener">help</a>
+    <span class="muted small">&middot;</span>
+    <a class="muted small help-link" href="https://github.com/monbooru/monsender/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy</a>
   </header>
 
   <div class="section">
@@ -59,9 +55,8 @@
     </div>
   </div>
 
-  <script src="../vendor/browser-polyfill.js"></script>
+  <script src="../lib/browser.js"></script>
   <script src="../lib/storage.js"></script>
-  <script src="../lib/perms.js"></script>
   <script src="../lib/api.js"></script>
   <script src="../lib/outcome.js"></script>
   <script src="../lib/ui.js"></script>

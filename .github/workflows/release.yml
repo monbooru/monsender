@@ -21,7 +21,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Build bundles
         run: node build.js
@@ -43,3 +43,14 @@ jobs:
           files: |
             dist/monsender-chrome-*.zip
             dist/monsender-firefox-*.xpi
+
+      - name: Install the web-ext toolchain
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm run tooling:webext
+
+      - name: Submit the Firefox bundle to AMO
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: npm run sign

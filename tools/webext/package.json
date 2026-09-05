@@ -1,0 +1,13 @@
+{
+  "name": "monsender-webext-tooling",
+  "version": "1.0.0",
+  "description": "Isolated lockfile for web-ext, the Mozilla CLI that lints and signs the Firefox build. The extension itself ships no dependencies.",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "web-ext": "10.6.0"
+  }
+}

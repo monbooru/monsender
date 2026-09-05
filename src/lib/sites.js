@@ -5,10 +5,8 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  const node = typeof module !== 'undefined' && module.exports;
-  const urls = node ? require('./urls.js') : (self.ML && self.ML.urls);
-  const api = node ? require('./api.js') : (self.ML && self.ML.api);
-  const storage = node ? require('./storage.js') : (self.ML && self.ML.storage);
+  const G = typeof self !== 'undefined' ? self : globalThis;
+  function ns() { return G.ML; }
 
   // The "will tags come?" hint: is this URL a gallery-dl-supported
   // booru, or just a raw file? A hint only - the authoritative result is the
@@ -41,7 +39,7 @@
 
   async function readCache() {
     if (listCache) return listCache;
-    try { listCache = await storage.getSitesCache(); } catch (e) { /* no extension storage */ }
+    try { listCache = await ns().storage.getSitesCache(); } catch (e) { /* no extension storage */ }
     return listCache;
   }
 
@@ -54,14 +52,14 @@
     const now = Date.now();
     const cached = await readCache();
     if (cached && cached.baseUrl === baseUrl && now - cached.at < TTL_MS) return cached.sites;
-    const r = await api.listSites(cfg);
+    const r = await ns().api.listSites(cfg);
     const data = (r && r.ok && r.data) || {};
     const sites = Array.isArray(data) ? data : (data.sites || []);
     // A failed or empty fetch is not cached, so a transient miss does not stick
     // for the TTL and blind every send in that window.
     if (sites.length) {
       listCache = { baseUrl, at: now, sites };
-      try { await storage.setSitesCache(listCache); } catch (e) { /* no extension storage */ }
+      try { await ns().storage.setSitesCache(listCache); } catch (e) { /* no extension storage */ }
     }
     return sites;
   }
@@ -73,16 +71,17 @@
   // 'blind' are both undecidable, but callers treat them apart: an unlisted host
   // loses to the raw file, a blind one does not.
   async function sendKind(cfg, url) {
-    if (urls.isImageUrl(url)) return 'image';
+    if (ns().urls.isImageUrl(url)) return 'image';
     if (!hostOf(url)) return 'unsupported';
     const list = await fetchSites(cfg);
     if (!list.length) return 'blind';
     return matchHost(list, url) ? 'supported' : 'unknown';
   }
 
+  // Exported for the tests, which need the module cache reset between cases.
   async function clearCache() {
     listCache = null;
-    try { await storage.setSitesCache(null); } catch (e) { /* no extension storage */ }
+    try { await ns().storage.setSitesCache(null); } catch (e) { /* no extension storage */ }
   }
 
   return { hostOf, matchHost, sendKind, clearCache };

@@ -16,11 +16,16 @@ monsender is a companion browser extension for monloader. It hands the page you'
 
 ```mermaid
 flowchart LR
-    web["- Any booru or gallery supported by gallery-dl<br/>- Direct image URL"]
-    ptr["Hydrus<br/>Public Tag Repository"]
-    sender(["<b>monsender</b><br/>browser extension"])
-    loader["<b>monloader</b><br/>downloader"]
-    booru["<b>monbooru</b><br/>Your self-hosted booru"]
+    web["`- Any booru or gallery supported by gallery-dl
+- Direct image URL`"]
+    ptr["`Hydrus
+Public Tag Repository`"]
+    sender(["`**monsender**
+browser extension`"])
+    loader["`**monloader**
+downloader`"]
+    booru["`**monbooru**
+Your self-hosted booru`"]
 
     web -->|browse| sender
     sender -->|send URL| loader
@@ -29,7 +34,8 @@ flowchart LR
 
     booru -.->|lookup by hash| loader
     loader -.->|reverse lookup: md5 + similarity| web
-    ptr <-.->|"sync: sha256 tags + aliases + implications<br/>contribute back (planned)"| loader
+    ptr <-.->|"`sync: sha256 tags + aliases + implications
+contribute back (planned)`"| loader
 
     classDef hub  fill:#5c6bc0,stroke:#9fa8da,stroke-width:3px,color:#ffffff;
     classDef tool fill:#16161c,stroke:#5c6bc0,stroke-width:1.5px,color:#c8c8c8;
@@ -48,16 +54,16 @@ flowchart LR
 
 Required permissions are minimal : `activeTab`, `scripting`, `storage`, `contextMenus`
 (and `sidePanel` on Chrome). It reads a page only on an explicit click. The
-single host it ever contacts is the monloader URL you configure, granted at
-runtime when you save settings.
+single host it ever contacts is the monloader URL you configure.
 
 ## Install
 
 <a href="https://addons.mozilla.org/en-US/firefox/addon/monsender/"><img alt="Get the Add-on" height="48" src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg"></a>
 
-Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> monsender** (needs monloader v1.2.0 or newer).
+Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> pairing**, in the **monsender extension** block.
 
-See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help.
+See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help,
+and [PRIVACY.md](PRIVACY.md).
 
 ## Build
 

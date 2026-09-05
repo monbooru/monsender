@@ -36,6 +36,7 @@
     return { ok: res.ok, status: res.status, data, headers: res.headers };
   }
 
+  // Exported for the options pairing loop, which waits the same way.
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
   // enqueue: with wait>0 a 200 returns the resolved job; otherwise (or on a
@@ -145,5 +146,5 @@
     return req(base(cfg) + '/api/v1/pair/status?id=' + encodeURIComponent(id), { headers: {} });
   }
 
-  return { enqueue, enqueueBatch, listQueue, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus };
+  return { enqueue, enqueueBatch, listQueue, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus, sleep };
 });

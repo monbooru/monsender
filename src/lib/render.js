@@ -5,17 +5,13 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  const node = typeof module !== 'undefined' && module.exports;
-  const ui = node ? require('./ui.js') : (self.ML && self.ML.ui);
+  const G = typeof self !== 'undefined' ? self : globalThis;
+  function ns() { return G.ML; }
 
   // Build a chooser card for one scan result. The preview is an <img>, or a
   // muted <video> for a video file; the URL is set with setAttribute and
   // scanned strings via textContent, never innerHTML, so a hostile scan string
   // can never become markup in the privileged panel.
-
-  // A user-facing word for the thumbnail placeholder when there is no preview
-  // or it failed to load; the raw URL is shown separately in the meta line.
-  function kindLabel(kind) { return kind === 'video' ? 'video' : 'image'; }
 
   function shortUrl(u) {
     if (/^data:/i.test(u)) return 'data: (inline)';
@@ -60,7 +56,11 @@
     return m ? +m[1] : 0;
   }
 
-  function placeholderText(url, kind) { return trimName(fileName(url)) || kindLabel(kind); }
+  // The file name for the thumbnail placeholder, falling back to a plain word
+  // for a URL that carries none; the raw URL is in the meta line either way.
+  function placeholderText(url, kind) {
+    return trimName(fileName(url)) || (kind === 'video' ? 'video' : 'image');
+  }
 
   // The resolution the grid loads: the narrowest the item advertises, so a
   // hundred-post gallery does not pull a hundred originals off third-party
@@ -125,11 +125,11 @@
     let dim = null;
     function showDims(w, h) {
       const bits = [];
-      if (w && h) bits.push(w + '×' + h);
+      if (w && h) bits.push(w + '\u00d7' + h);
       if (ext) bits.push(ext);
-      if (!bits.length) return;
+      if (!bits.length && !dim) return;
       if (!dim) { dim = doc.createElement('div'); dim.className = 'dim'; label.appendChild(dim); }
-      dim.textContent = bits.join(' · ');
+      dim.textContent = bits.join(' \u00b7 ');
     }
 
     const thumb = doc.createElement('div');
@@ -212,9 +212,12 @@
         cb.value = u;
         ext = fileExt(u);
         activeUrl = u;
+        // Drop the previous variant's size right away: only a load can supply
+        // the new one, and with previews off no load ever happens.
+        showDims(0, 0);
         fillThumb(u);
       };
-      tokens.forEach((t) => ui.onActivate(t, () => activate(t)));
+      tokens.forEach((t) => ns().ui.onActivate(t, () => activate(t)));
       const def = tokens.find((t) => t.getAttribute('data-url') === item.url) || tokens[0];
       def.classList.add('active');
       activeSize = def;

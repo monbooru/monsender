@@ -18,30 +18,30 @@ const TARGETS = ['chrome', 'firefox'];
 
 // The background's dependency list. Chrome's service worker pulls these in with
 // importScripts inside bg.js; Firefox's event page has no importScripts, so the
-// same list (polyfill first, bg.js last) is loaded via background.scripts. Keep
+// same list (alias first, bg.js last) is loaded via background.scripts. Keep
 // this in sync with the importScripts call in src/bg.js.
 const BG_SCRIPTS = [
-  'vendor/browser-polyfill.js',
+  'lib/browser.js',
   'lib/storage.js', 'lib/api.js', 'lib/outcome.js', 'lib/urls.js',
   'lib/sites.js', 'lib/scan-core.js', 'lib/send.js',
   'bg.js'
 ];
 
 function readVersion() {
-  return fs.readFileSync(path.join(ROOT, 'VERSION.md'), 'utf8').trim().replace(/^v/, '');
+  const v = fs.readFileSync(path.join(ROOT, 'VERSION.md'), 'utf8');
+  return v.trim().replace(/^v/, '');
 }
 
 function buildManifest(target, version) {
-  const m = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
+  const base = path.join(SRC, 'manifest.json');
+  const m = JSON.parse(fs.readFileSync(base, 'utf8'));
   m.version = version;
   if (target === 'chrome') {
-    // sidePanel is a Chrome permission; it is silent (no install warning).
     m.permissions = [...m.permissions, 'sidePanel'];
     m.background = { service_worker: 'bg.js' };
     m.side_panel = { default_path: 'panel/panel.html' };
   } else if (target === 'firefox') {
-    // Firefox MV3 uses an event-page background (the polyfill loads first) and
-    // the sidebar_action key in place of the sidePanel permission.
+
     m.background = { scripts: BG_SCRIPTS };
     m.sidebar_action = {
       default_panel: 'panel/panel.html',
@@ -52,9 +52,7 @@ function buildManifest(target, version) {
       open_at_install: false
     };
     m.browser_specific_settings = {
-      // 140: optional_host_permissions need >=128, and the
-      // data_collection_permissions key (we declare no collection - PRIVACY.md)
-      // needs >=140. web-ext lint is the source of these floors.
+
       gecko: {
         id: 'monsender@leqwin',
         strict_min_version: '140.0',
@@ -94,7 +92,9 @@ if (require.main === module) {
     const ext = t === 'firefox' ? 'xpi' : 'zip';
     const out = path.join(DIST, `monsender-${t}-v${version}.${ext}`);
     const info = zipDir(dest, out);
-    console.log(`built ${t} v${version} -> ${path.relative(ROOT, dest)} (${info.files} files, ${path.relative(ROOT, out)})`);
+    const rel = (p) => path.relative(ROOT, p);
+    console.log(`built ${t} v${version} -> ${rel(dest)} ` +
+      `(${info.files} files, ${rel(out)})`);
   }
 }
 

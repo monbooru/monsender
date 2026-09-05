@@ -5,17 +5,16 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  const node = typeof module !== 'undefined' && module.exports;
-  const api = node ? require('./api.js') : (self.ML && self.ML.api);
-  const outcome = node ? require('./outcome.js') : (self.ML && self.ML.outcome);
+  const G = typeof self !== 'undefined' ? self : globalThis;
+  function ns() { return G.ML; }
 
-  // The pieces every extension page needs. The popup, the side panel, and the
-  // options page each carried their own copy of the connection indicator and
-  // of these handlers, and the copies had begun to disagree.
+  // The pieces every extension page needs, in one place so the popup, the side
+  // panel, and the options page cannot drift apart.
 
   const $ = (id) => document.getElementById(id);
 
-  function setConn(el, state, label) {
+  function setConn(state, label) {
+    const el = $('conn');
     el.textContent = '';
     const dot = document.createElement('span');
     dot.className = 'dot dot-' + state;
@@ -25,16 +24,21 @@
     el.appendChild(txt);
   }
 
-  function connLabel(state) {
-    return state === 'ok' ? 'connected' : (state === 'rejected' ? 'token rejected' : 'unreachable');
-  }
+  const CONN_LABEL = {
+    ok: 'connected',
+    rejected: 'token rejected',
+    unpaired: 'not paired yet',
+    down: 'unreachable'
+  };
+
+  function connLabel(state) { return CONN_LABEL[state] || CONN_LABEL.down; }
 
   // Reachability plus one authed call, since monloader may require a token we
   // do not hold. The health body rides along for the version line.
   async function probe(cfg) {
-    const health = await api.health(cfg);
-    const authed = await api.listQueue(cfg, { limit: 1 });
-    const state = outcome.connState(health, authed);
+    const health = await ns().api.health(cfg);
+    const authed = await ns().api.listQueue(cfg, { limit: 1 });
+    const state = ns().outcome.connState(health, authed);
     return { state, label: connLabel(state), health };
   }
 
@@ -59,7 +63,5 @@
     if (closeAfter) window.close();
   }
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  return { $, setConn, connLabel, probe, onActivate, setActionEnabled, openQueue, sleep };
+  return { $, setConn, connLabel, probe, onActivate, setActionEnabled, openQueue };
 });

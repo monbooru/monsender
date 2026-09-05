@@ -1,13 +1,10 @@
-/* Shared palette and base styles for the popup, side panel, and options page.
-   Tokens are monloader's exactly so the surfaces
-   read as the same family: dark, monospace, terminal-flavored, indigo accent. */
 :root {
   --bg:         #0d0d0d;
   --bg-surface: #16161c;
   --bg-input:   #111118;
   --border:     #2a2a36;
-  --fg:         #c8c8c8;
-  --fg-dim:     #6a6a82;
+  --fg:         #e2e2e8;
+  --fg-dim:     #8888a0;
   --accent:     #5c6bc0;
   --success:    #22aa44;
   --warning:    #ffaa00;
@@ -40,7 +37,6 @@ button, input, select, textarea {
 button { cursor: pointer; background: var(--bg-surface); }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { cursor: not-allowed; color: var(--fg-dim); }
-/* Primary action (send) filled with monloader's indigo. */
 .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .primary:hover:not(:disabled) { filter: brightness(1.12); }
 .primary:disabled { background: var(--bg-surface); border-color: var(--border); }
@@ -50,7 +46,6 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 .small { font-size: 12px; }
 .nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Status (job) and outcome (item) colors - same vocabulary as monloader. */
 .st-queued, .st-running, .tone-accent { color: var(--accent); }
 .st-succeeded, .tone-success { color: var(--success); }
 .st-partial, .tone-warning { color: var(--warning); }
@@ -66,24 +61,14 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-dim); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .dot-ok { background: var(--success); }
-.dot-checking, .dot-rejected { background: var(--warning); }
+.dot-checking, .dot-rejected, .dot-unpaired { background: var(--warning); }
 .dot-down { background: var(--error); }
 
-/* Settings sections. */
-.section { border: 1px solid var(--border); padding: 12px; margin-bottom: 16px; }
-.section h2 {
-  font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
-  color: var(--accent); margin-bottom: 10px;
-  border-bottom: 1px solid var(--border); padding-bottom: 4px;
-}
-.field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-.field label { width: 150px; flex-shrink: 0; color: var(--fg-dim); }
-.field input[type=text], .field input[type=password], .field input[type=number], .field select {
-  flex: 1; min-width: 0; max-width: 420px;
-}
-.field .hint { flex-basis: 100%; color: var(--fg-dim); font-size: 11px; padding-left: 158px; }
-.actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
-.actions + .conn { margin-top: 8px; }
-/* Brand logo mirrors monloader's topbar logo; the wordmark treatment (caps,
-   bold, letter-spacing) lives with each surface's brand header. */
 .logo { height: 40px; width: auto; flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.brand strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+.brand:hover strong { color: var(--accent); }
+
+.qact, .sact { color: var(--accent); cursor: pointer; }
+.qact:hover, .sact:hover { text-decoration: underline; }
+.qact.disabled, .sact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }

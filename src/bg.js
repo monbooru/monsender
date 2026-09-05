@@ -5,7 +5,7 @@
 // and the guard is a no-op. Keep this list in sync with BG_SCRIPTS.
 if (typeof importScripts === 'function') {
   importScripts(
-    'vendor/browser-polyfill.js',
+    'lib/browser.js',
     'lib/storage.js', 'lib/api.js', 'lib/outcome.js', 'lib/urls.js',
     'lib/sites.js', 'lib/scan-core.js', 'lib/send.js'
   );
@@ -14,20 +14,15 @@ if (typeof importScripts === 'function') {
 const ML = self.ML;
 
 // Action badge after a send made without the popup. Text is the running count
-// of items queued since the popup was last opened (the popup clears it), or "!"
-// when nothing was queued so a skip/failure is still visible. Color carries the
-// outcome kind.
-const BADGE_COLOR = {
-  created: '#22aa44', queued: '#5c6bc0',
-  duplicate: '#6a6a82', skipped: '#6a6a82', canceled: '#6a6a82', done: '#6a6a82',
-  failed: '#cc3333', unsupported: '#cc3333', down: '#cc3333', rejected: '#cc3333'
-};
+// of items queued since the popup was last opened (the popup clears it), or
+// "!" when the send queued nothing, so a skip or a failure shows whatever the
+// count already stood at. Color carries the outcome kind.
 async function setBadge(kind, queued) {
   try {
+    await browser.action.setBadgeBackgroundColor({ color: ML.outcome.badgeColor(kind) });
+    if (!queued) return browser.action.setBadgeText({ text: '!' });
     const cur = parseInt(await browser.action.getBadgeText({}), 10) || 0;
-    const n = cur + (queued || 0);
-    await browser.action.setBadgeBackgroundColor({ color: BADGE_COLOR[kind] || '#5c6bc0' });
-    await browser.action.setBadgeText({ text: n > 0 ? String(n) : '!' });
+    await browser.action.setBadgeText({ text: String(cur + queued) });
   } catch (e) { /* action API unavailable */ }
 }
 
@@ -36,17 +31,17 @@ async function setBadge(kind, queued) {
 async function recordSend(out) {
   if (!out || !out.configured) return out;
   if (out.jobId) {
-    try { await ML.storage.addRecentJobIds([out.jobId]); } catch (e) {}
+    try { await ML.storage.addRecentJobIds([out.jobId]); } catch (e) { /* the ring is a nicety */ }
   }
   await setBadge(out.outcome.kind, out.jobId ? 1 : 0);
-  try { await browser.action.setTitle({ title: out.outcome.text }); } catch (e) {}
+  try { await browser.action.setTitle({ title: out.outcome.text }); } catch (e) { /* action API unavailable */ }
   return out;
 }
 
 async function sendUrl(url, opts) {
   if (!url) return;
   if (!(await ML.send.isConfigured())) {
-    try { await browser.runtime.openOptionsPage(); } catch (e) {}
+    try { await browser.runtime.openOptionsPage(); } catch (e) { /* nothing else to offer */ }
     return;
   }
   return recordSend(await ML.send.sendOne(url, opts));
@@ -55,7 +50,7 @@ async function sendUrl(url, opts) {
 // Nothing for gallery-dl to fetch: report it rather than enqueuing.
 async function reportUnsupported() {
   await setBadge('unsupported', 0);
-  try { await browser.action.setTitle({ title: 'not a supported site or image' }); } catch (e) {}
+  try { await browser.action.setTitle({ title: 'not a supported site or image' }); } catch (e) { /* action API unavailable */ }
 }
 
 // The page-send paths (keyboard command, "send current page") gate on the same
@@ -71,12 +66,23 @@ async function sendPage(url) {
   return sendUrl(url);
 }
 
-// Keyboard command: send the active tab. The command is a user
-// gesture, so activeTab grants this tab's URL without the tabs permission.
+// The tab a gesture is about. activeTab grants this tab's URL for that
+// gesture without the tabs permission; a window with nothing in it, or a
+// refused query, yields null and each caller says what that means.
+async function activeTab() {
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    return tab || null;
+  } catch (e) { return null; }
+}
+
+// Keyboard command: send the active tab. A browser page or the add-on store
+// yields no URL at all; report that rather than leaving the shortcut looking
+// broken.
 async function sendActiveTab() {
-  let tab;
-  try { [tab] = await browser.tabs.query({ active: true, currentWindow: true }); } catch (e) {}
-  if (tab && tab.url) await sendPage(tab.url);
+  const tab = await activeTab();
+  if (tab && tab.url) return sendPage(tab.url);
+  return reportUnsupported();
 }
 browser.commands.onCommand.addListener((cmd) => { if (cmd === 'send-page') sendActiveTab(); });
 
@@ -84,28 +90,30 @@ browser.commands.onCommand.addListener((cmd) => { if (cmd === 'send-page') sendA
 // scan runs in the background so it survives the popup closing (opening the
 // Firefox sidebar dismisses the popup). The panel reads the result from storage.
 async function scanActiveTab() {
-  let tab;
-  try { [tab] = await browser.tabs.query({ active: true, currentWindow: true }); } catch (e) {}
+  // Without a tab there is nothing to scan; the panel keeps the last result.
+  const tab = await activeTab();
   if (!tab) return;
   const s = await ML.storage.getSettings();
   let fin = { items: [], total: 0, shown: 0, truncated: false };
   let blocked = false;
+  let incomplete = false;
   try {
     const res = await browser.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['lib/urls.js', 'lib/scan-core.js', 'lib/scan-run.js']
     });
-    const raw = JSON.parse((res && res[0] && res[0].result) || '[]');
-    fin = ML.scanCore.finalize(raw, { cap: s.scanCap, minSize: s.minImageSize });
+    const raw = JSON.parse((res && res[0] && res[0].result) || '{}');
+    incomplete = !!raw.incomplete;
+    fin = ML.scanCore.finalize(raw.items || [], { cap: s.scanCap, minSize: s.minImageSize });
   } catch (e) {
     // Injection refused (a browser page, the add-on store, a PDF viewer). The
     // scan never ran, which is a different answer from an image-free page.
     blocked = true;
   }
   await ML.storage.setScan({
-    tabId: tab.id, url: tab.url,
+    url: tab.url,
     items: fin.items, total: fin.total, shown: fin.shown, truncated: fin.truncated,
-    blocked, previews: s.previews, at: Date.now()
+    incomplete, blocked, previews: s.previews
   });
 }
 browser.runtime.onMessage.addListener((msg) => {
@@ -122,7 +130,7 @@ async function setupMenus() {
   try { await browser.contextMenus.removeAll(); } catch (e) {}
   try {
     browser.contextMenus.create({ id: 'ml-send', title: 'Send to monloader', contexts: ['image', 'video'] });
-  } catch (e) {}
+  } catch (e) { /* a duplicate id on a re-run of onInstalled */ }
 }
 browser.runtime.onInstalled.addListener(setupMenus);
 browser.runtime.onStartup.addListener(setupMenus);
@@ -162,7 +170,7 @@ async function largestForSrc(tabId, frameId, srcUrl) {
       func: (want) => {
         for (const img of document.querySelectorAll('img')) {
           if (img.currentSrc !== want && img.src !== want) continue;
-          const pick = self.ML.scanCore.bestUrl(img);
+          const pick = self.ML.scanCore.bestCand(img).url;
           try { return pick ? new URL(pick, document.baseURI).href : null; } catch (e) { return null; }
         }
         return null;
@@ -175,69 +183,18 @@ async function largestForSrc(tabId, frameId, srcUrl) {
 
 // A short-lived toast next to the clicked image, offering to narrow a page
 // send to the pointed file. Injected under the same gesture's activeTab grant
-// like the scan; renders into a shadow root, executes no page strings, and
-// resolves 'image', 'dismiss', or null on timeout. The countdown bar is the
-// only accent line so nothing static reads as remaining time.
+// like the scan: the module is loaded by file, then called, since a func: body
+// cannot close over module scope.
 const TOAST_MS = 6000;
 
 async function toastForChoice(tabId, frameId, srcUrl) {
+  const target = frameId != null ? { tabId, frameIds: [frameId] } : { tabId };
   try {
+    await browser.scripting.executeScript({ target, files: ['lib/toast.js'] });
     const [res] = await browser.scripting.executeScript({
-      target: frameId != null ? { tabId, frameIds: [frameId] } : { tabId },
+      target,
       args: [srcUrl, TOAST_MS],
-      func: (target, ttl) => new Promise((resolve) => {
-        let anchor = null;
-        for (const img of document.querySelectorAll('img')) {
-          if (img.currentSrc === target || img.src === target) { anchor = img.getBoundingClientRect(); break; }
-        }
-        const host = document.createElement('div');
-        const root = host.attachShadow({ mode: 'open' });
-        const style = document.createElement('style');
-        style.textContent =
-          '.t{position:fixed;z-index:2147483647;background:#1b1d27;color:#c8cadb;' +
-          'border:1px solid #2c2f3f;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;' +
-          'padding:8px 10px 10px;white-space:nowrap;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
-          '.r{display:flex;align-items:center;gap:8px}' +
-          '.a{font:inherit;background:none;border:0;color:#aab2e8;' +
-          'padding:0;cursor:pointer;white-space:nowrap}' +
-          '.a:hover{text-decoration:underline}' +
-          '.x{font:inherit;background:none;border:0;color:#6a6a82;cursor:pointer;padding:0}' +
-          '.l{position:absolute;left:0;bottom:0;height:2px;background:#5c6bc0;width:100%}' +
-          '.l.run{transition:width ' + ttl + 'ms linear;width:0}' +
-          '@media (prefers-reduced-motion:reduce){.l.run{transition:none}}';
-        const box = document.createElement('div');
-        box.className = 't';
-        const row = document.createElement('div'); row.className = 'r';
-        const msg = document.createElement('span'); msg.textContent = 'sent the post page';
-        const act = document.createElement('button'); act.className = 'a'; act.textContent = '[only this image]';
-        const x = document.createElement('button'); x.className = 'x'; x.textContent = '[x]';
-        x.setAttribute('aria-label', 'dismiss');
-        const life = document.createElement('span'); life.className = 'l';
-        row.append(msg, act, x); box.append(row, life);
-        root.append(style, box);
-        document.documentElement.appendChild(host);
-        // Position after insertion so the box's real size is known. A large
-        // image can sit mostly off-screen, so anchor to its visible part and
-        // clamp into the viewport; an image scrolled fully out falls back to
-        // the corner.
-        let left = null, top = null;
-        if (anchor) {
-          const vl = Math.max(anchor.left, 0), vr = Math.min(anchor.right, innerWidth);
-          const vt = Math.max(anchor.top, 0), vb = Math.min(anchor.bottom, innerHeight);
-          if (vr > vl && vb > vt) { left = vl + 6; top = vb - box.offsetHeight - 6; }
-        }
-        if (left == null) {
-          left = innerWidth - box.offsetWidth - 16;
-          top = innerHeight - box.offsetHeight - 16;
-        }
-        box.style.left = Math.min(Math.max(8, left), innerWidth - box.offsetWidth - 8) + 'px';
-        box.style.top = Math.min(Math.max(8, top), innerHeight - box.offsetHeight - 8) + 'px';
-        requestAnimationFrame(() => life.classList.add('run'));
-        const done = (v) => { clearTimeout(timer); host.remove(); resolve(v); };
-        const timer = setTimeout(() => done(null), ttl);
-        act.addEventListener('click', () => done('image'));
-        x.addEventListener('click', () => done('dismiss'));
-      })
+      func: (url, ttl) => self.ML.toast.show(url, ttl)
     });
     return res && res.result;
   } catch (e) { return null; }

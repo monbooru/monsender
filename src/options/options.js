@@ -1,6 +1,6 @@
 'use strict';
 (function () {
-  const { storage, perms, api, urls, ui } = self.ML;
+  const { storage, api, urls, ui } = self.ML;
   const $ = ui.$;
   let lastSavedUrl = '';
 
@@ -17,8 +17,7 @@
   }
 
   const normalizeUrl = urls.normalizeUrl;
-  const setConn = (state, label) => ui.setConn($('conn'), state, label);
-  const sleep = ui.sleep;
+  const sleep = api.sleep;
 
   // The token itself is never echoed back, only whether one is held.
   function setTokenState(has) {
@@ -36,13 +35,22 @@
     lastSavedUrl = s.baseUrl;
   }
 
+  // Read the numbers into range and put them back on screen, so the field and
+  // the stored value never disagree: a scan cap typed as 99999 is saved as
+  // 1000, and leaving 99999 in the box makes the truncation note look wrong.
   function readForm() {
-    return {
+    const typed = ['wait', 'scanCap', 'minSize'].map((id) => $(id).value.trim());
+    const patch = {
       waitSeconds: clampInt($('wait').value, 0, 60, 20),
       scanCap: clampInt($('scanCap').value, 1, 1000, 100),
       minImageSize: clampInt($('minSize').value, 0, 4000, 64),
       previews: $('previews').checked
     };
+    $('wait').value = patch.waitSeconds;
+    $('scanCap').value = patch.scanCap;
+    $('minSize').value = patch.minImageSize;
+    const adjusted = ['wait', 'scanCap', 'minSize'].some((id, i) => $(id).value !== typed[i]);
+    return { patch, adjusted };
   }
 
   // A token belongs to the instance that issued it, so a URL typed but not yet
@@ -53,22 +61,26 @@
     return { baseUrl, token: baseUrl === s.baseUrl ? s.token : '' };
   }
 
-  async function save() {
+  // The URL on screen, normalized in place, or '' with the reason flashed.
+  // Both actions that reach monloader start here, so one rule decides what
+  // counts as a URL worth trying.
+  function urlFromForm() {
     const url = normalizeUrl($('baseUrl').value);
     $('baseUrl').value = url;
-    if (!url) { setFlash('set a monloader URL first', 'flash-err'); return; }
-    if (!urls.isReachableBase(url)) { setFlash('not a valid URL', 'flash-err'); return; }
+    if (!url) { setFlash('set a monloader URL first', 'flash-err'); return ''; }
+    if (!urls.isReachableBase(url)) { setFlash('not a valid URL', 'flash-err'); return ''; }
+    return url;
+  }
 
-    let granted = true;
-    try {
-      const oldUrl = lastSavedUrl && lastSavedUrl !== url ? lastSavedUrl : null;
-      granted = await perms.syncOrigin(url, oldUrl);
-    } catch (e) { granted = false; }
-    if (!granted) {
-      setFlash('host access for ' + url + ' was not granted; monloader cannot be reached until you allow it', 'flash-warn');
-    }
+  async function save() {
+    const url = urlFromForm();
+    if (!url) return;
+    // A pairing stores the URL it started with, and the wait runs up to 90 s,
+    // so an approval landing after the URL was changed here would put the old
+    // one back. Saving anything else leaves the pairing alone.
+    if (pairing && pairing.url !== url) pairing.canceled = true;
 
-    const patch = readForm();
+    const { patch, adjusted } = readForm();
     patch.baseUrl = url;
     // A token is bound to the instance that issued it; a changed URL drops the
     // stored token so the old key is never sent to a different monloader.
@@ -80,9 +92,9 @@
     const saved = await storage.setSettings(patch);
     lastSavedUrl = saved.baseUrl;
     setTokenState(!!saved.token);
-    if (granted) setFlash(cleared ? 'saved; URL changed, cleared the stored token' : 'saved', 'flash-ok');
-    // Always refresh the dot: when the grant was denied, test() short-circuits
-    // to the "allow host access" state instead of leaving a stale indicator.
+    setFlash('saved'
+      + (cleared ? '; URL changed, cleared the stored token' : '')
+      + (adjusted ? '; some values were brought into range' : ''), 'flash-ok');
     test();
   }
 
@@ -94,18 +106,10 @@
 
   async function connect() {
     if (pairing) { pairing.canceled = true; return; }
-    const url = normalizeUrl($('baseUrl').value);
-    $('baseUrl').value = url;
-    if (!url) { setFlash('set a monloader URL first', 'flash-err'); return; }
-    if (!urls.isReachableBase(url)) { setFlash('not a valid URL', 'flash-err'); return; }
-    let granted = false;
-    try {
-      const oldUrl = lastSavedUrl && lastSavedUrl !== url ? lastSavedUrl : null;
-      granted = await perms.syncOrigin(url, oldUrl);
-    } catch (e) { granted = false; }
-    if (!granted) { setFlash('host access for ' + url + ' was not granted', 'flash-warn'); return; }
+    const url = urlFromForm();
+    if (!url) return;
 
-    const job = pairing = { canceled: false };
+    const job = pairing = { canceled: false, url };
     $('connect').textContent = 'cancel pairing';
     try {
       setFlash('requesting pairing...', 'flash-warn');
@@ -115,7 +119,7 @@
         setFlash((r.data && r.data.error) || (r.networkError ? 'monloader unreachable' : 'pairing request failed'), 'flash-err');
         return;
       }
-      setFlash('approve the request in monloader (settings -> monsender), waiting...', 'flash-warn');
+      setFlash('approve the request in monloader (settings -> pairing), waiting...', 'flash-warn');
       const id = r.data.request_id;
       for (let i = 0; i < 60; i++) {
         await sleep(1500);
@@ -142,18 +146,15 @@
 
   async function test() {
     const cfg = await cfgFromForm();
-    if (!cfg.baseUrl) { setConn('down', 'no URL'); return; }
-    setConn('checking', 'checking');
-    try {
-      if (!(await perms.hasOrigin(cfg.baseUrl))) { setConn('down', 'allow host access (save first)'); return; }
-    } catch (e) { /* fall through */ }
+    if (!cfg.baseUrl) { ui.setConn('down', 'no URL'); return; }
+    ui.setConn('checking', 'checking');
     const { state, label, health } = await ui.probe(cfg);
     // Settings is where the versions belong, so it labels a good connection
     // with them rather than with the plain "connected" the other pages show.
-    if (state !== 'ok') { setConn(state, label); return; }
+    if (state !== 'ok') { ui.setConn(state, label); return; }
     const v = (health.data && health.data.version) || '?';
     const g = (health.data && health.data.gallerydl_version) || '?';
-    setConn('ok', 'monloader ' + v + ' / gallery-dl ' + g);
+    ui.setConn('ok', 'monloader ' + v + ' / gallery-dl ' + g);
   }
 
   $('save').addEventListener('click', save);

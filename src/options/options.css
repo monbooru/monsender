@@ -1,0 +1,21 @@
+body { max-width: 680px; margin: 0 auto; padding: 16px; }
+
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+header strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+header .help-link:first-of-type { margin-left: auto; }
+.tokenstate { margin-left: 12px; }
+
+.section { border: 1px solid var(--border); padding: 12px; margin-bottom: 16px; }
+.section h2 {
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--accent); margin-bottom: 10px;
+  border-bottom: 1px solid var(--border); padding-bottom: 4px;
+}
+.field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.field label { width: 150px; flex-shrink: 0; color: var(--fg-dim); }
+.field input[type=text], .field input[type=number], .field select { flex: 1; min-width: 0; max-width: 420px; }
+.field .hint { flex-basis: 100%; color: var(--fg-dim); font-size: 11px; padding-left: 158px; }
+.actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.actions::before { content: ""; flex: 0 100 150px; }
+.actions #save { margin-left: auto; }
+.actions + .conn { margin-top: 8px; }

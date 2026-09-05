@@ -1,9 +1,6 @@
 body { padding: 8px; min-width: 280px; }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.brand strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
-.brand:hover strong { color: var(--accent); }
 
 .targetrow { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
 .targetrow[hidden] { display: none; }
@@ -12,17 +9,12 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 
 .bar { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .bar .selacts { margin-left: auto; display: flex; gap: 8px; }
-.sact { color: var(--accent); cursor: pointer; }
-.sact:hover { text-decoration: underline; }
-.sact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); grid-auto-rows: 150px; gap: 6px; }
 .card { border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; overflow: hidden; }
 .card:has(.pick:checked) { border-color: var(--accent); }
 .cardlabel { display: flex; flex-direction: column; flex: 1; min-height: 0; cursor: pointer; position: relative; }
 .card .pick { position: absolute; margin: 4px; z-index: 1; }
-/* The thumb absorbs the slack so a card stays a fixed height whether or not the
-   meta, dim, and size-selector rows are present. */
 .card .thumb { position: relative; width: 100%; flex: 1; min-height: 0; display: flex; align-items: center;
   justify-content: center; background: var(--bg-input); overflow: hidden; }
 .card .thumb img, .card .thumb video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }

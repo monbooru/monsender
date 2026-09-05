@@ -1,5 +1,20 @@
 # Changelog
 
+## [v1.4.0] - 2026-09-05
+### Changed
+- The extension no longer need host permission.
+### Fixed
+- A monloader with no token set reads as "not paired yet", not unreachable.
+- Failed jobs name the reason instead of showing monloader's raw error code.
+- Queue rows show counts for every outcome, including the jobs monbooru enqueues.
+- Force download is offered only on jobs where it can fetch again.
+- Scanning from the popup opens the side panel on Chrome, with no manual open.
+- The side panel picks up settings saved after it was opened, without a reload.
+- The chooser says when a page was too large to scan fully.
+- Picking another resolution updates the size and type line when previews are off.
+- Changing the monloader URL abandons a pairing waiting for approval.
+- The pairing prompt points at monloader's settings -> pairing, where you approve it.
+
 ## [v1.3.1] - 2026-07-31
 ### Fixed
 - Right-click sends the post, not the raw file, on a supported site alias set in monloader such as *.donmai.us. ([#3](https://github.com/monbooru/monsender/issues/3))

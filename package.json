@@ -1,7 +1,7 @@
 {
   "name": "monsender",
-  "version": "1.3.1",
-  "description": "Send the current page or its images to your monloader download queue.",
+  "version": "1.4.0",
+  "description": "Send the current page or its images to the download queue of the monloader server you run.",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -10,8 +10,10 @@
     "build:firefox": "node build.js firefox",
     "icons": "node tools/gen-icons.js",
     "clean": "rm -rf dist",
-    "lint": "npx --yes web-ext lint --source-dir dist/firefox --self-hosted",
-    "run:firefox": "npx --yes web-ext run --source-dir dist/firefox"
+    "tooling:webext": "npm ci --prefix tools/webext",
+    "lint": "tools/webext/node_modules/.bin/web-ext lint --source-dir dist/firefox --self-hosted",
+    "sign": "tools/webext/node_modules/.bin/web-ext sign --source-dir dist/firefox --channel listed --approval-timeout 0",
+    "run:firefox": "tools/webext/node_modules/.bin/web-ext run --source-dir dist/firefox"
   },
   "keywords": [
     "browser-extension",
@@ -25,5 +27,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/monbooru/monsender"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

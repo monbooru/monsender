@@ -8,14 +8,9 @@ const zlib = require('zlib');
 const { crc32 } = require('./crc32.js');
 
 function listFiles(dir) {
-  const out = [];
-  (function walk(d) {
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else out.push({ rel: path.relative(dir, p).split(path.sep).join('/'), abs: p });
-    }
-  })(dir);
+  const out = fs.readdirSync(dir, { recursive: true })
+    .map((rel) => ({ rel: rel.split(path.sep).join('/'), abs: path.join(dir, rel) }))
+    .filter((f) => fs.statSync(f.abs).isFile());
   out.sort((a, b) => (a.rel < b.rel ? -1 : 1));
   return out;
 }

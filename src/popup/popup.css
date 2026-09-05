@@ -2,11 +2,7 @@ body { width: 360px; padding: 10px; }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .hleft { display: flex; align-items: center; gap: 10px; }
-.brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.brand strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
-.brand:hover strong { color: var(--accent); }
 
-/* Global pause control: indigo while downloads run, orange while held; fixed width so toggling the glyph does not resize it. */
 .pause-btn { width: 32px; padding: 4px 0; font-size: 16px; line-height: 16px; color: var(--accent); border-color: var(--accent); }
 .pause-btn:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .pause-btn.paused { color: var(--warning); border-color: var(--warning); }
@@ -22,7 +18,6 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .row button { flex: 0 0 auto; }
 .row #send { flex: 1; }
 
-/* Reserve exactly one line so showing/hiding the message never resizes the popup. */
 .result { min-height: 1.5em; margin-bottom: 8px; font-size: 13px; line-height: 1.5;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -38,7 +33,4 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .qrow .qsum { flex: 0 0 auto; color: var(--fg-dim); }
 .qrow.mine .qsite::before { content: "* "; color: var(--accent); }
 .qrow .qactions { display: flex; gap: 8px; margin-top: 1px; }
-.qact { color: var(--accent); cursor: pointer; }
-.qact:hover { text-decoration: underline; }
-.qact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }
 .empty { color: var(--fg-dim); font-size: 12px; }
