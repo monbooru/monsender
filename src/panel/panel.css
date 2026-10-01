@@ -1,10 +1,7 @@
 body { padding: 8px; min-width: 280px; }
 
-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-
 .targetrow { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
 .targetrow[hidden] { display: none; }
-.targetrow .prompt { flex: 0 0 auto; color: var(--accent); font-weight: bold; }
 .targetrow .target { flex: 1; min-width: 0; color: var(--fg-dim); font-size: 12px; }
 
 .bar { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }

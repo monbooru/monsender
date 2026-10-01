@@ -8,9 +8,7 @@
   async function init() {
     const s = await storage.getSettings();
     cfg = send.cfgOf(s);
-    // Watch before the unconfigured exit: opening the panel, finding it needs
-    // a URL, setting one and coming back is the ordinary first-run order, and
-    // the panel has to pick up the settings and the scan that follow.
+    // Before the unconfigured return: on first run the URL is set later.
     watchScan();
     if (!cfg.baseUrl) {
       ui.setConn('down', 'set monloader URL');
@@ -21,8 +19,6 @@
     showStoredScan();
   }
 
-  // Show the most recent scan immediately; watchScan swaps in a fresh one when
-  // the background stores it (e.g. right after the popup's "scan page").
   async function showStoredScan() {
     const stored = await storage.getScan();
     if (scan) return; // a fresher one landed while this read was in flight
@@ -30,14 +26,19 @@
     renderChooser();
   }
 
-  // Re-render when the background stores a new scan, so re-scanning refreshes an
-  // already-open panel instead of showing the previous results.
+  // The panel stays open across pairing, URL changes and outages, so the dot
+  // is probed again whenever one of those could have moved it.
   function watchScan() {
     browser.storage.onChanged.addListener((changes) => {
       const st = changes.settings && changes.settings.newValue;
-      if (st && st.baseUrl && !cfg.baseUrl) { cfg = send.cfgOf(st); refreshConn(); showStoredScan(); }
+      if (st && (st.baseUrl !== cfg.baseUrl || st.token !== cfg.token)) {
+        const first = !cfg.baseUrl;
+        cfg = send.cfgOf(st);
+        refreshConn();
+        if (first) showStoredScan();
+      }
       const sc = changes.lastScan && changes.lastScan.newValue;
-      if (sc && Array.isArray(sc.items)) { scan = sc; renderChooser(); }
+      if (sc && Array.isArray(sc.items)) { scan = sc; renderChooser(); refreshConn(); }
     });
   }
 
@@ -46,9 +47,16 @@
     ui.setConn(state, label);
   }
 
+  function setMsg(text, tone) {
+    const m = $('scanmsg');
+    m.textContent = text;
+    m.className = 'small tone-' + tone;
+  }
+
   function renderChooser() {
     const grid = $('grid');
     grid.textContent = '';
+    if (!sending) setMsg('', 'dim');
     const su = $('scanurl');
     if (scan && scan.url) {
       $('scanUrl').textContent = scan.url;
@@ -80,20 +88,18 @@
   function allPicks() {
     return Array.from(document.querySelectorAll('input.pick'));
   }
+  // Held for the whole batch: a pick toggled or a grid rebuilt mid-send would
+  // otherwise re-arm it and start a second batch alongside the first.
+  let sending = false;
+
   function updateSendBtn() {
     const all = allPicks();
     const n = all.filter((c) => c.checked).length;
     $('sendSel').textContent = 'send selected (' + n + ')';
-    $('sendSel').disabled = n === 0;
+    $('sendSel').disabled = sending || n === 0;
     ui.setActionEnabled($('selNone'), n > 0);
     ui.setActionEnabled($('selAll'), all.length > 0 && n < all.length);
   }
-  function selectAll() {
-    allPicks().forEach((c) => { c.checked = true; });
-    updateSendBtn();
-  }
-  function clearSelection() { keepSelected([]); }
-  // Tick exactly these and nothing else.
   function keepSelected(urls) {
     const keep = new Set(urls);
     allPicks().forEach((c) => { c.checked = keep.has(c.getAttribute('data-url')); });
@@ -101,30 +107,34 @@
   }
   async function sendSelected() {
     const urls = picked();
-    if (!urls.length) return;
-    $('sendSel').disabled = true;
-    $('scanmsg').textContent = 'sending ' + urls.length + '...';
-    // Scanned files carry the scanned page as their source.
-    const r = await send.sendMany(urls, { options: { pageUrl: scan && scan.url } });
-    if (!r.configured) { $('scanmsg').textContent = 'set monloader URL in options'; updateSendBtn(); return; }
+    if (!urls.length || sending) return;
+    const from = scan;
+    sending = true;
+    updateSendBtn();
+    setMsg('sending ' + urls.length + '...', 'dim');
+    let r;
+    try {
+      r = await send.sendMany(urls, { options: { pageUrl: from && from.url } });
+    } finally {
+      sending = false;
+    }
+    if (!r.configured) { setMsg('set monloader URL in options', 'error'); updateSendBtn(); return; }
     if (r.ids.length) await storage.addRecentJobIds(r.ids);
-    // Counts alone leave a rejected token looking like N unexplained failures,
-    // so carry the first mapped reason alongside them.
     const msg = r.failed
       ? 'sent ' + r.ids.length + ' of ' + urls.length + '; ' + r.failed + ' failed'
         + (r.outcome ? ' - ' + r.outcome.text : '')
       : 'sent ' + r.ids.length + ' to the queue';
-    const tone = r.failed ? (r.ids.length ? 'warning' : 'error') : 'dim';
-    $('scanmsg').textContent = msg;
-    if (r.ids.length) browser.runtime.sendMessage({ type: 'queued', count: r.ids.length }).catch(() => {});
-    // Leave exactly the failures ticked, so pressing send again retries those
-    // instead of re-enqueuing what already landed.
-    keepSelected(r.failedUrls || []);
+    setMsg(msg, r.failed ? (r.ids.length ? 'warning' : 'error') : 'dim');
+    if (r.ids.length) browser.runtime.sendMessage({ type: 'queued', count: r.ids.length }).catch(() => { /* the badge is a nicety */ });
+    // A rescan mid-send rebuilt the grid: its picks are not this batch's.
+    if (scan === from) keepSelected(r.failedUrls || []);
+    else updateSendBtn();
+    refreshConn();
   }
 
   ui.onActivate($('brand'), () => ui.openQueue(cfg));
-  ui.onActivate($('selAll'), selectAll);
-  ui.onActivate($('selNone'), clearSelection);
+  ui.onActivate($('selAll'), () => keepSelected(allPicks().map((c) => c.getAttribute('data-url'))));
+  ui.onActivate($('selNone'), () => keepSelected([]));
   $('sendSel').addEventListener('click', sendSelected);
   init();
 })();

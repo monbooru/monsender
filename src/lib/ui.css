@@ -9,6 +9,7 @@
   --success:    #22aa44;
   --warning:    #ffaa00;
   --error:      #cc3333;
+  /* No rule reads these; they stay to mirror monloader's palette. */
   --cat-general:   #3d90e3;
   --cat-character: #00aa00;
   --cat-artist:    #cc0000;
@@ -64,10 +65,12 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 .dot-checking, .dot-rejected, .dot-unpaired { background: var(--warning); }
 .dot-down { background: var(--error); }
 
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .logo { height: 40px; width: auto; flex-shrink: 0; }
 .brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.brand strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+.brand strong, header strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
 .brand:hover strong { color: var(--accent); }
+.targetrow .prompt { flex: 0 0 auto; color: var(--accent); font-weight: bold; }
 
 .qact, .sact { color: var(--accent); cursor: pointer; }
 .qact:hover, .sact:hover { text-decoration: underline; }

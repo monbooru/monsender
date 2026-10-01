@@ -11,12 +11,8 @@
   // Runs in the page: injected into the active tab under activeTab, so it
   // reaches nothing privileged - no storage, no api, no token.
 
-  // The page scan. Detection adapted from ushiro's content.js, made
-  // page-wide and returning data (collect runs in the page via
-  // scripting.executeScript; finalize is pure and runs in the caller). The
-  // injection model is load-bearing: no standing content script.
+  // collect runs in the page; finalize is pure and runs in the caller.
 
-  // srcset candidates as { url, w } (w is the Nw descriptor, 0 if none).
   function srcsetCands(srcset) {
     return String(srcset).split(',').map((s) => {
       const p = s.trim().split(/\s+/);
@@ -25,11 +21,6 @@
     }).filter((c) => c.url);
   }
 
-  // Every distinct resolution the element advertises (srcset entries + src), so
-  // the chooser can offer a smaller one. The largest stays the default
-  // (bestCand). A media element's <source> children describe the same image or
-  // video, so they ride along here instead of becoming cards of their own -
-  // an <img> takes its <picture> siblings, a <video> its own children.
   const MEDIA_PARENT = { PICTURE: 1, VIDEO: 1, AUDIO: 1 };
 
   function sourcesOf(el) {
@@ -52,84 +43,77 @@
     return cands;
   }
 
-  // The largest variant the element offers: a candidate wider than the rendered
-  // image, else the full src, else what the browser loaded. The descriptor
-  // width rides along because it describes a different file than the one the
-  // page rendered and measured.
   function bestCand(n) {
     const cands = variantsOf(n);
     let best = null, bv = n.naturalWidth || 0;
     for (const c of cands) if (c.w > bv) { bv = c.w; best = c; }
-    // A <video> carries its file on its <source> children, so src and
-    // currentSrc are both empty until the browser has picked one.
-    return best || { url: n.src || n.currentSrc || (cands[0] && cands[0].url), w: 0 };
+    if (best) return best;
+    // In a <picture> the img's src is the fallback for browsers without one,
+    // not a larger original, so what it rendered wins.
+    const shown = n.parentNode && n.parentNode.nodeName === 'PICTURE'
+      ? n.currentSrc || n.src : n.src || n.currentSrc;
+    // A <video>'s src and currentSrc stay empty until it picks a <source>.
+    return { url: shown || (cands[0] && cands[0].url), w: 0 };
   }
 
-  // A pathological page can hold an enormous DOM; cap how many elements the
-  // walk visits so the per-element getComputedStyle cannot stall the page. The
-  // bound is far above any real gallery.
+  // Bounds getComputedStyle cost on a huge DOM; far above any real gallery.
   const MAX_VISIT = 30000;
 
-  // Walk the document (and shadow roots), collecting candidate image URLs as
-  // absolute strings. Returns { items, incomplete }: incomplete says the walk
-  // hit maxVisit, so the list describes part of the page. doc/win are passed
-  // explicitly so this is testable under jsdom and self-contained when
-  // injected.
+  // Reaches the page only through doc and win, so jsdom can stand in for it.
   function collect(doc, win, opts) {
     const maxVisit = (opts && opts.maxVisit) || MAX_VISIT;
     const out = [];
     const seen = new Set();
     const baseURI = doc.baseURI;
 
-    function toAbs(raw, isData) {
+    // A blob: or data: URL has nothing monloader could fetch, and a data: one
+    // would carry its whole payload out of the page.
+    function toAbs(raw) {
       if (!raw) return null;
       const t = String(raw).trim();
-      if (!t || t.startsWith('blob:')) return null;
-      if (isData || t.startsWith('data:')) return t;
+      if (!t || /^(blob|data):/i.test(t)) return null;
       try { return new win.URL(t, baseURI).href; } catch (e) { return null; }
     }
 
-    function add(raw, isData, tag, w, h, variants, dw) {
-      const t = toAbs(raw, isData);
+    function add(raw, tag, w, h, variants, dw) {
+      const t = toAbs(raw);
       if (!t || seen.has(t)) return;
       seen.add(t);
       const item = { url: t, tag: tag || '', w: w || 0, h: h || 0 };
       if (dw) item.dw = dw;
       if (variants) {
-        const vs = [], vseen = new Set();
+        // The rendered source is listed again under its descriptor; the
+        // descriptor's width is the one kept.
+        const widths = new Map();
         for (const v of variants) {
-          const u = toAbs(v.url, false);
-          if (!u || vseen.has(u)) continue;
-          vseen.add(u);
-          vs.push({ url: u, w: v.w || 0 });
+          const u = toAbs(v.url);
+          if (u) widths.set(u, Math.max(widths.get(u) || 0, v.w || 0));
         }
-        if (vs.length > 1) item.variants = vs;
+        if (widths.size > 1) item.variants = Array.from(widths, ([url, w]) => ({ url, w }));
       }
       out.push(item);
     }
 
     function visit(n) {
       const nn = n.nodeName && n.nodeName.toUpperCase();
-      // A <source> belongs to the <picture> or <video> around it (variantsOf
-      // folds them in), so a card each would multiply the same file.
+      // A <source> folds into its <picture> or <video>, and a <picture> is its
+      // img, which carries those sources: neither is a card of its own.
       const inMedia = nn === 'SOURCE' && n.parentNode && MEDIA_PARENT[n.parentNode.nodeName];
-      if (!inMedia && (nn === 'IMG' || nn === 'SOURCE' || nn === 'VIDEO' || nn === 'PICTURE')) {
-        // One card per element, defaulting to the largest variant; the other
-        // resolutions ride along so the chooser can offer a smaller one.
+      if (!inMedia && (nn === 'IMG' || nn === 'SOURCE' || nn === 'VIDEO')) {
         const c = bestCand(n);
-        add(c.url, false, nn,
+        add(c.url, nn,
           n.naturalWidth || n.videoWidth || n.width, n.naturalHeight || n.videoHeight || n.height,
           variantsOf(n), c.w);
-        if (n.poster) add(n.poster, false, 'IMG');
+        if (n.poster) add(n.poster, 'IMG');
       } else if (nn === 'A') {
-        if (n.href && ns().urls.isImageUrl(n.href)) add(n.href, false, 'A');
+        if (n.href && ns().urls.isImageUrl(n.href)) add(n.href, 'A');
       }
       try {
         const cs = win.getComputedStyle(n);
         const bg = cs && cs.backgroundImage;
         if (bg && bg !== 'none') {
           const m = /url\((['"]?)(.+?)\1\)/.exec(bg);
-          if (m && m[2]) add(m[2], m[2].startsWith('data:'), nn);
+          if (m && m[2]) add(m[2], nn);
         }
       } catch (e) { /* computed style unavailable */ }
     }
@@ -149,14 +133,10 @@
     return { items: out, incomplete: false };
   }
 
-  // The two containers monbooru takes as video, told apart from images because
-  // the chooser previews them differently.
   const VIDEO_EXT = /\.(mp4|webm)(\?|#|$)/i;
-  // Media monloader recognizes but monbooru will not take, so the download is
-  // declined before it starts: offering one would promise a send that cannot
-  // land. A URL carrying no extension is not judged here - a CDN image often
-  // has none, and monloader is the authority on those.
-  const DECLINED_EXT = /\.(svg|avif|bmp|tiff?|heic|heif|m4v|mov|mkv|avi|ogv)(\?|#|$)/i;
+  // monbooru will not take these, so monloader declines them up front.
+  // An extensionless URL is left to monloader: CDN images often have none.
+  const DECLINED_EXT = /\.(svg|bmp|tiff?|heic|heif|m4v|mov|mkv|avi|ogv)(\?|#|$)/i;
 
   function classify(url) {
     if (url.startsWith('data:')) return 'data';
@@ -171,8 +151,6 @@
     return k === 'http' || k === 'video';
   }
 
-  // The resolutions to offer for one item: fetchable, deduped, the default
-  // (largest) first then widest down. Null when there is no real choice.
   function pickVariants(list, primary) {
     const seen = new Set();
     const out = [];
@@ -187,9 +165,6 @@
     return out;
   }
 
-  // Dedupe, keep the http(s) files monloader can actually land in monbooru
-  // (a data: URL has nothing to fetch; a declined container has nowhere to go),
-  // cap.
   function finalize(raw, opts) {
     opts = opts || {};
     const cap = opts.cap || 100;
@@ -201,10 +176,8 @@
       if (!url || seen.has(url)) continue;
       const kind = classify(url);
       if (kind !== 'http' && kind !== 'video') continue;
-      // Drop icons/trackers when the size is known. A lazy page ships a 1x1
-      // placeholder in src and the real image in srcset, so a measured size
-      // describes a different file than the chosen URL; its advertised width
-      // is then the only size that says anything about what will be sent.
+      // A lazy page's measured size belongs to its 1x1 placeholder, so a
+      // chosen srcset candidate is judged by its advertised width.
       if (minSize && (r.dw ? r.dw < minSize : (r.w && r.h && (r.w < minSize || r.h < minSize)))) continue;
       seen.add(url);
       const item = { url, tag: (r && r.tag) || '', kind, w: (r && r.w) || 0, h: (r && r.h) || 0 };

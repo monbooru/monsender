@@ -8,14 +8,8 @@
   // Runs in the page: injected into the active tab under activeTab, so it
   // reaches nothing privileged - no storage, no api, no token.
 
-  // A short-lived offer next to the clicked image, asking whether to narrow a
-  // page send to the pointed file. Renders into a shadow root node by node, so
-  // no page string is ever parsed as markup, and resolves 'image', 'dismiss',
-  // or null on timeout. The countdown bar is the only accent line so nothing
-  // static reads as remaining time.
-  //
-  // ui.css cannot reach a shadow root in the page, so the palette is repeated
-  // here; the values are monloader's tokens and must stay them.
+  // Built node by node, so no page string becomes markup. ui.css cannot
+  // reach a shadow root, so monloader's palette tokens are copied here.
   const CSS =
     '.t{position:fixed;z-index:2147483647;background:#16161c;color:#e2e2e8;' +
     'border:1px solid #2a2a36;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;' +
@@ -34,7 +28,9 @@
         if (img.currentSrc === target || img.src === target) { anchor = img.getBoundingClientRect(); break; }
       }
       const host = document.createElement('div');
-      const root = host.attachShadow({ mode: 'open' });
+      // Closed, and deaf to synthetic clicks: page script must not be able to
+      // make the choice for the user.
+      const root = host.attachShadow({ mode: 'closed' });
       const style = document.createElement('style');
       style.textContent = CSS +
         '.l.run{transition:width ' + ttl + 'ms linear;width:0}' +
@@ -50,10 +46,7 @@
       row.append(msg, act, x); box.append(row, life);
       root.append(style, box);
       document.documentElement.appendChild(host);
-      // Position after insertion so the box's real size is known. A large
-      // image can sit mostly off-screen, so anchor to its visible part and
-      // clamp into the viewport; an image scrolled fully out falls back to
-      // the corner.
+      // Positioned after insertion, once the box has a real size.
       let left = null, top = null;
       if (anchor) {
         const vl = Math.max(anchor.left, 0), vr = Math.min(anchor.right, innerWidth);
@@ -69,8 +62,8 @@
       requestAnimationFrame(() => life.classList.add('run'));
       const done = (v) => { clearTimeout(timer); host.remove(); resolve(v); };
       const timer = setTimeout(() => done(null), ttl);
-      act.addEventListener('click', () => done('image'));
-      x.addEventListener('click', () => done('dismiss'));
+      act.addEventListener('click', (e) => { if (e.isTrusted) done('image'); });
+      x.addEventListener('click', (e) => { if (e.isTrusted) done('dismiss'); });
     });
   }
 

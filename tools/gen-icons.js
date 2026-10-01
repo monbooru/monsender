@@ -1,8 +1,4 @@
 'use strict';
-// Derive the small action icons from the 128 px monloader logo
-// (src/assets/icon128.png, shared with monloader/monbooru). icon48 and icon16
-// are area-averaged downscales of it. Zero-dependency PNG decode + encode so the
-// build needs no image tooling; the source must be 8-bit RGBA, non-interlaced.
 
 const fs = require('fs');
 const zlib = require('zlib');
@@ -87,8 +83,7 @@ function decode(buf) {
   return { width, height, rgba: out };
 }
 
-// Box-average downscale on premultiplied alpha (so transparent edges do not
-// bleed dark), returning a tw*th RGBA buffer.
+// Averaged on premultiplied alpha, so transparent edges do not bleed dark.
 function downscale(src, sw, sh, t) {
   const out = Buffer.alloc(t * t * 4);
   const sx = sw / t, sy = sh / t;

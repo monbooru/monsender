@@ -8,9 +8,6 @@
   const G = typeof self !== 'undefined' ? self : globalThis;
   function ns() { return G.ML; }
 
-  // The pieces every extension page needs, in one place so the popup, the side
-  // panel, and the options page cannot drift apart.
-
   const $ = (id) => document.getElementById(id);
 
   function setConn(state, label) {
@@ -33,17 +30,15 @@
 
   function connLabel(state) { return CONN_LABEL[state] || CONN_LABEL.down; }
 
-  // Reachability plus one authed call, since monloader may require a token we
-  // do not hold. The health body rides along for the version line.
+  // Plus one authed call: /health answers without a token, so alone it
+  // cannot tell a rejected or missing one.
   async function probe(cfg) {
     const health = await ns().api.health(cfg);
     const authed = await ns().api.listQueue(cfg, { limit: 1 });
-    const state = ns().outcome.connState(health, authed);
+    const state = ns().outcome.connState(health, authed, !!cfg.token);
     return { state, label: connLabel(state), health };
   }
 
-  // Bracketed text acts as a button, so it answers the keyboard too. A control
-  // marked aria-disabled ignores both.
   function onActivate(el, fn) {
     const go = () => { if (el.getAttribute('aria-disabled') !== 'true') fn(); };
     el.addEventListener('click', go);
@@ -59,7 +54,7 @@
 
   function openQueue(cfg, closeAfter) {
     if (!cfg.baseUrl) return;
-    browser.tabs.create({ url: cfg.baseUrl + '/queue' });
+    browser.tabs.create({ url: cfg.baseUrl + '/queue' }).catch(() => { /* a convenience link: a refusal has nowhere to show */ });
     if (closeAfter) window.close();
   }
 

@@ -54,7 +54,9 @@ contribute back (planned)`"| loader
 
 Required permissions are minimal : `activeTab`, `scripting`, `storage`, `contextMenus`
 (and `sidePanel` on Chrome). It reads a page only on an explicit click. The
-single host it ever contacts is the monloader URL you configure.
+single host it sends anything to is the monloader URL you configure; with
+previews on, the scan chooser's thumbnails load from the sites hosting the
+images.
 
 ## Install
 

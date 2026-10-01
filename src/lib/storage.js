@@ -5,8 +5,8 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  // Settings live in storage.local only. The token is a secret and must never
-  // go to storage.sync (which uploads to a browser account).
+  // storage.local only: the token must never reach storage.sync, which
+  // uploads to a browser account.
   const DEFAULTS = {
     baseUrl: '',
     token: '',
@@ -20,25 +20,20 @@
 
   function area() { return browser.storage.local; }
 
-  function withDefaults(s) {
-    return Object.assign({}, DEFAULTS, s || {});
-  }
-
   async function getSettings() {
     const r = await area().get('settings');
-    return withDefaults(r.settings);
+    return Object.assign({}, DEFAULTS, r.settings);
   }
 
+  // Job ids are numbered per instance, so the ring does not outlive a URL
+  // change: another monloader's rows would match it.
   async function setSettings(patch) {
     const cur = await getSettings();
     const next = Object.assign({}, cur, patch);
-    await area().set({ settings: next });
+    await area().set(next.baseUrl === cur.baseUrl ? { settings: next } : { settings: next, recentJobIds: [] });
     return next;
   }
 
-  // Bounded ring of job ids this browser enqueued, so the queue view can flag
-  // "mine". storage.local persists across worker restarts; this is loose
-  // "recent", not a strict session.
   async function getRecentJobIds() {
     const r = await area().get('recentJobIds');
     return Array.isArray(r.recentJobIds) ? r.recentJobIds : [];
@@ -52,25 +47,14 @@
     return next;
   }
 
-  // The scan handoff popup -> side panel. Uses storage.session when available
-  // (cleared on browser close) and falls back to local when it is missing.
   function sessionArea() {
     return (browser.storage && browser.storage.session) ? browser.storage.session : browser.storage.local;
   }
+  async function sessionGet(key) { return (await sessionArea().get(key))[key] || null; }
   async function setScan(data) { await sessionArea().set({ lastScan: data }); }
-  async function getScan() {
-    const r = await sessionArea().get('lastScan');
-    return r.lastScan || null;
-  }
-
-  // The gallery-dl site list. It is the largest response the extension fetches
-  // and most gestures consult it, so it outlives the module that holds it: the
-  // MV3 worker is torn down between gestures and the popup dies on close.
+  const getScan = () => sessionGet('lastScan');
   async function setSitesCache(v) { await sessionArea().set({ sitesCache: v }); }
-  async function getSitesCache() {
-    const r = await sessionArea().get('sitesCache');
-    return r.sitesCache || null;
-  }
+  const getSitesCache = () => sessionGet('sitesCache');
 
   return {
     getSettings, setSettings, getRecentJobIds, addRecentJobIds,

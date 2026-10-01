@@ -1,5 +1,20 @@
 # Changelog
 
+## [v1.4.1] - 2026-10-01
+### Changed
+- The chooser offers AVIF and JPEG XL images.
+### Fixed
+- A refused send names the reason: monbooru link paused, monbooru not set up, or API off.
+- With no token held, a monloader that needs one reads "not paired yet", not "token rejected".
+- The side panel's connection dot follows pairing, URL changes and outages.
+- A batch with failures shows its result line in the warning or error colour.
+- Clear all removes every finished job, interrupted ones included, past the first page.
+- A collapsed series in the popup sums every window, not only the newest eight.
+- The only-this-image toast appears only for images monloader can fetch, and spares finished jobs.
+- A <picture> shows as one card and sends its full-size source, not the small fallback.
+- Scanning with no readable tab says so, instead of showing the previous page's scan.
+- The options address hint shows port 8456, where monloader listens.
+
 ## [v1.4.0] - 2026-09-05
 ### Changed
 - The extension no longer need host permission.

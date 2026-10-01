@@ -19,6 +19,10 @@
   const normalizeUrl = urls.normalizeUrl;
   const sleep = api.sleep;
 
+  // Each input's own min and max are its range, so options.html is the one
+  // place a range is written.
+  const NUMBERS = [['wait', 'waitSeconds', 20], ['scanCap', 'scanCap', 100], ['minSize', 'minImageSize', 64]];
+
   // The token itself is never echoed back, only whether one is held.
   function setTokenState(has) {
     $('tokenState').textContent = has ? 'token: set' : 'token: not set';
@@ -27,43 +31,32 @@
   async function load() {
     const s = await storage.getSettings();
     $('baseUrl').value = s.baseUrl;
-    $('wait').value = s.waitSeconds;
-    $('scanCap').value = s.scanCap;
-    $('minSize').value = s.minImageSize;
+    for (const [id, key] of NUMBERS) $(id).value = s[key];
     $('previews').checked = s.previews;
     setTokenState(!!s.token);
     lastSavedUrl = s.baseUrl;
   }
 
-  // Read the numbers into range and put them back on screen, so the field and
-  // the stored value never disagree: a scan cap typed as 99999 is saved as
-  // 1000, and leaving 99999 in the box makes the truncation note look wrong.
   function readForm() {
-    const typed = ['wait', 'scanCap', 'minSize'].map((id) => $(id).value.trim());
-    const patch = {
-      waitSeconds: clampInt($('wait').value, 0, 60, 20),
-      scanCap: clampInt($('scanCap').value, 1, 1000, 100),
-      minImageSize: clampInt($('minSize').value, 0, 4000, 64),
-      previews: $('previews').checked
-    };
-    $('wait').value = patch.waitSeconds;
-    $('scanCap').value = patch.scanCap;
-    $('minSize').value = patch.minImageSize;
-    const adjusted = ['wait', 'scanCap', 'minSize'].some((id, i) => $(id).value !== typed[i]);
+    const patch = { previews: $('previews').checked };
+    let adjusted = false;
+    for (const [id, key, dflt] of NUMBERS) {
+      const el = $(id);
+      const typed = el.value.trim();
+      patch[key] = clampInt(typed, Number(el.min), Number(el.max), dflt);
+      el.value = patch[key];
+      if (el.value !== typed) adjusted = true;
+    }
     return { patch, adjusted };
   }
 
-  // A token belongs to the instance that issued it, so a URL typed but not yet
-  // saved gets the unauthenticated probe rather than that instance's key.
+  // The token belongs to the saved URL; an unsaved one is probed without it.
   async function cfgFromForm() {
     const s = await storage.getSettings();
     const baseUrl = normalizeUrl($('baseUrl').value) || s.baseUrl;
     return { baseUrl, token: baseUrl === s.baseUrl ? s.token : '' };
   }
 
-  // The URL on screen, normalized in place, or '' with the reason flashed.
-  // Both actions that reach monloader start here, so one rule decides what
-  // counts as a URL worth trying.
   function urlFromForm() {
     const url = normalizeUrl($('baseUrl').value);
     $('baseUrl').value = url;
@@ -75,15 +68,12 @@
   async function save() {
     const url = urlFromForm();
     if (!url) return;
-    // A pairing stores the URL it started with, and the wait runs up to 90 s,
-    // so an approval landing after the URL was changed here would put the old
-    // one back. Saving anything else leaves the pairing alone.
+    // A pairing still waiting would restore its own URL on approval.
     if (pairing && pairing.url !== url) pairing.canceled = true;
 
     const { patch, adjusted } = readForm();
     patch.baseUrl = url;
-    // A token is bound to the instance that issued it; a changed URL drops the
-    // stored token so the old key is never sent to a different monloader.
+    // A new URL drops the token: it belongs to the instance that issued it.
     let cleared = false;
     if (lastSavedUrl && lastSavedUrl !== url) {
       const cur = await storage.getSettings();
@@ -98,10 +88,6 @@
     test();
   }
 
-  // connect pairs with monloader without copying keys: it requests a pairing,
-  // the operator approves in monloader, and the issued token is stored here.
-  // The wait runs up to 90 s, so the button becomes the way out of it: a second
-  // click cancels rather than starting a second pairing racing the first.
   let pairing = null;
 
   async function connect() {
@@ -149,8 +135,6 @@
     if (!cfg.baseUrl) { ui.setConn('down', 'no URL'); return; }
     ui.setConn('checking', 'checking');
     const { state, label, health } = await ui.probe(cfg);
-    // Settings is where the versions belong, so it labels a good connection
-    // with them rather than with the plain "connected" the other pages show.
     if (state !== 'ok') { ui.setConn(state, label); return; }
     const v = (health.data && health.data.version) || '?';
     const g = (health.data && health.data.gallerydl_version) || '?';
@@ -161,6 +145,5 @@
   $('test').addEventListener('click', test);
   $('connect').addEventListener('click', connect);
 
-  // Scripts are at the end of <body>, so the DOM above exists. Init now.
   load().then(test);
 })();

@@ -1,11 +1,4 @@
 'use strict';
-// Build the per-browser extension bundles from src/.
-//
-// Chrome and Firefox MV3 differ in three places: the
-// background type, the side-panel mechanism, and the Firefox gecko id. The
-// base manifest in src/manifest.json holds the common fields; buildManifest()
-// applies the per-target patches. It is exported so the permission-audit test
-// can check the generated manifests without a build.
 
 const fs = require('fs');
 const path = require('path');
@@ -16,10 +9,6 @@ const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
 const TARGETS = ['chrome', 'firefox'];
 
-// The background's dependency list. Chrome's service worker pulls these in with
-// importScripts inside bg.js; Firefox's event page has no importScripts, so the
-// same list (alias first, bg.js last) is loaded via background.scripts. Keep
-// this in sync with the importScripts call in src/bg.js.
 const BG_SCRIPTS = [
   'lib/browser.js',
   'lib/storage.js', 'lib/api.js', 'lib/outcome.js', 'lib/urls.js',
@@ -47,8 +36,7 @@ function buildManifest(target, version) {
       default_panel: 'panel/panel.html',
       default_title: 'monsender',
       default_icon: m.icons,
-      // Do not pop the sidebar open on load; it opens only when the user scans
-      // (Firefox defaults open_at_install to true).
+      // Firefox defaults this to true; the sidebar opens only on a scan.
       open_at_install: false
     };
     m.browser_specific_settings = {
@@ -59,11 +47,8 @@ function buildManifest(target, version) {
         data_collection_permissions: { required: ['none'], optional: [] }
       }
     };
-    // Lint note: web-ext reports one advisory warning
-    // (KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION) because Firefox for
-    // Android has not yet implemented data_collection_permissions. The
-    // extension is desktop-oriented (sidebar/commands), and declaring no data
-    // collection is the correct, AMO-forward choice; the warning is accepted.
+    // The web-ext KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION warning on
+    // data_collection_permissions is accepted: AMO wants the declaration.
   } else {
     throw new Error('unknown target: ' + target);
   }
@@ -74,7 +59,6 @@ function build(target, version) {
   const dest = path.join(DIST, target);
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(dest, { recursive: true });
-  // Copy the whole source tree, then overwrite the generated manifest.
   fs.cpSync(SRC, dest, { recursive: true });
   fs.writeFileSync(
     path.join(dest, 'manifest.json'),

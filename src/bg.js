@@ -1,8 +1,6 @@
 'use strict';
-// Service worker (Chrome) / event page (Firefox). On Chrome the libs are pulled
-// in with importScripts; on Firefox they are listed ahead of bg.js in
-// background.scripts (build.js BG_SCRIPTS), so importScripts is undefined here
-// and the guard is a no-op. Keep this list in sync with BG_SCRIPTS.
+// Firefox's event page has no importScripts; its background.scripts loads
+// these libs instead.
 if (typeof importScripts === 'function') {
   importScripts(
     'lib/browser.js',
@@ -13,50 +11,55 @@ if (typeof importScripts === 'function') {
 
 const ML = self.ML;
 
-// Action badge after a send made without the popup. Text is the running count
-// of items queued since the popup was last opened (the popup clears it), or
-// "!" when the send queued nothing, so a skip or a failure shows whatever the
-// count already stood at. Color carries the outcome kind.
+// The running count lives in the badge text. "!" marks a send that queued
+// nothing and goes after the count, which the next send counts on from.
 async function setBadge(kind, queued) {
   try {
     await browser.action.setBadgeBackgroundColor({ color: ML.outcome.badgeColor(kind) });
-    if (!queued) return browser.action.setBadgeText({ text: '!' });
     const cur = parseInt(await browser.action.getBadgeText({}), 10) || 0;
-    await browser.action.setBadgeText({ text: String(cur + queued) });
+    await browser.action.setBadgeText({ text: queued ? String(cur + queued) : (cur || '') + '!' });
   } catch (e) { /* action API unavailable */ }
 }
 
-// Badge, "mine" ring, and action title for a settled send. Split out of sendUrl
-// so a send whose fate is still open records only once its branch resolves.
+// The badge count and the job-id ring are read, then written: two sends
+// landing together would each read before the other wrote, and lose one.
+let writes = Promise.resolve();
+function inTurn(fn) {
+  const run = writes.then(fn);
+  writes = run.catch(() => { /* a failed write must not hold up the next */ });
+  return run;
+}
+
 async function recordSend(out) {
   if (!out || !out.configured) return out;
-  if (out.jobId) {
-    try { await ML.storage.addRecentJobIds([out.jobId]); } catch (e) { /* the ring is a nicety */ }
-  }
-  await setBadge(out.outcome.kind, out.jobId ? 1 : 0);
-  try { await browser.action.setTitle({ title: out.outcome.text }); } catch (e) { /* action API unavailable */ }
+  await inTurn(async () => {
+    if (out.jobId) {
+      try { await ML.storage.addRecentJobIds([out.jobId]); } catch (e) { /* the ring is a nicety */ }
+    }
+    await setBadge(out.outcome.kind, out.jobId ? 1 : 0);
+    try { await browser.action.setTitle({ title: out.outcome.text }); } catch (e) { /* action API unavailable */ }
+  });
   return out;
 }
 
 async function sendUrl(url, opts) {
   if (!url) return;
-  if (!(await ML.send.isConfigured())) {
+  const out = await ML.send.sendOne(url, opts);
+  if (!out.configured) {
     try { await browser.runtime.openOptionsPage(); } catch (e) { /* nothing else to offer */ }
     return;
   }
-  return recordSend(await ML.send.sendOne(url, opts));
+  return recordSend(out);
 }
 
-// Nothing for gallery-dl to fetch: report it rather than enqueuing.
 async function reportUnsupported() {
-  await setBadge('unsupported', 0);
-  try { await browser.action.setTitle({ title: 'not a supported site or image' }); } catch (e) { /* action API unavailable */ }
+  await inTurn(async () => {
+    await setBadge('unsupported', 0);
+    try { await browser.action.setTitle({ title: 'not a supported site or image' }); } catch (e) { /* action API unavailable */ }
+  });
 }
 
-// The page-send paths (keyboard command, "send current page") gate on the same
-// classification as the popup. An undecidable result (the sites list could not
-// be fetched) still sends, leaving monloader the authority. The pointed-image
-// send is never gated.
+// Only a positively unsupported URL is refused; monloader judges the rest.
 async function sendPage(url) {
   if (!url) return;
   const s = await ML.storage.getSettings();
@@ -66,9 +69,8 @@ async function sendPage(url) {
   return sendUrl(url);
 }
 
-// The tab a gesture is about. activeTab grants this tab's URL for that
-// gesture without the tabs permission; a window with nothing in it, or a
-// refused query, yields null and each caller says what that means.
+// activeTab exposes the URL during a gesture, so no tabs permission is
+// needed; a refused query reads as no tab.
 async function activeTab() {
   try {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -76,9 +78,6 @@ async function activeTab() {
   } catch (e) { return null; }
 }
 
-// Keyboard command: send the active tab. A browser page or the add-on store
-// yields no URL at all; report that rather than leaving the shortcut looking
-// broken.
 async function sendActiveTab() {
   const tab = await activeTab();
   if (tab && tab.url) return sendPage(tab.url);
@@ -86,48 +85,44 @@ async function sendActiveTab() {
 }
 browser.commands.onCommand.addListener((cmd) => { if (cmd === 'send-page') sendActiveTab(); });
 
-// Page scan. The popup opens the chooser panel and messages here; the
-// scan runs in the background so it survives the popup closing (opening the
-// Firefox sidebar dismisses the popup). The panel reads the result from storage.
 async function scanActiveTab() {
-  // Without a tab there is nothing to scan; the panel keeps the last result.
   const tab = await activeTab();
-  if (!tab) return;
   const s = await ML.storage.getSettings();
   let fin = { items: [], total: 0, shown: 0, truncated: false };
-  let blocked = false;
+  // No tab to read is a scan that could not run: the panel the popup just
+  // opened must not go on showing the last page's.
+  let blocked = !tab;
   let incomplete = false;
-  try {
-    const res = await browser.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['lib/urls.js', 'lib/scan-core.js', 'lib/scan-run.js']
-    });
-    const raw = JSON.parse((res && res[0] && res[0].result) || '{}');
-    incomplete = !!raw.incomplete;
-    fin = ML.scanCore.finalize(raw.items || [], { cap: s.scanCap, minSize: s.minImageSize });
-  } catch (e) {
-    // Injection refused (a browser page, the add-on store, a PDF viewer). The
-    // scan never ran, which is a different answer from an image-free page.
-    blocked = true;
+  if (tab) {
+    try {
+      const res = await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['lib/urls.js', 'lib/scan-core.js', 'lib/scan-run.js']
+      });
+      const raw = JSON.parse((res && res[0] && res[0].result) || '{}');
+      incomplete = !!raw.incomplete;
+      fin = ML.scanCore.finalize(raw.items || [], { cap: s.scanCap, minSize: s.minImageSize });
+    } catch (e) {
+      // Injection refused: a browser page, the add-on store, a PDF viewer.
+      blocked = true;
+    }
   }
+  // Stamped, since storage reports a change only when a value differs, and a
+  // rescan of an unchanged page must still reach the panel.
   await ML.storage.setScan({
-    url: tab.url,
+    url: tab ? tab.url : '',
     items: fin.items, total: fin.total, shown: fin.shown, truncated: fin.truncated,
-    incomplete, blocked, previews: s.previews
+    incomplete, blocked, previews: s.previews, at: Date.now()
   });
 }
 browser.runtime.onMessage.addListener((msg) => {
   if (!msg) return;
   if (msg.type === 'scan') scanActiveTab();
-  else if (msg.type === 'queued') setBadge('queued', msg.count || 0);
+  else if (msg.type === 'queued') inTurn(() => setBadge('queued', msg.count || 0));
 });
 
-// Context menu: one entry on an image or video. It resolves the best target for
-// the click - a supported linked post (tagged), else the supported page
-// (tagged), else the raw file - so the click is always sendable.
 async function setupMenus() {
-  // A failing removeAll must not stop the entry being created.
-  try { await browser.contextMenus.removeAll(); } catch (e) {}
+  try { await browser.contextMenus.removeAll(); } catch (e) { /* a failing removeAll must not stop the entry being created */ }
   try {
     browser.contextMenus.create({ id: 'ml-send', title: 'Send to monloader', contexts: ['image', 'video'] });
   } catch (e) { /* a duplicate id on a re-run of onInstalled */ }
@@ -135,11 +130,8 @@ async function setupMenus() {
 browser.runtime.onInstalled.addListener(setupMenus);
 browser.runtime.onStartup.addListener(setupMenus);
 
-// Prefer a linked post, then the page, over the raw file, which carries no tags.
-// A file link ('image') and a positively unlisted host ('unknown') lose to the
-// file; a 'blind' result (no sites list) does not - if the page is a booru its
-// file is likely an unfetchable CDN link, and if not, monloader judges it. With
-// monloader unset or nothing better pointed at, the raw file.
+// A tagged post or page beats the raw file, and so does a 'blind' one: on
+// a booru the file is likely an unfetchable CDN link.
 async function resolveMenuTarget(cfg, info) {
   if (cfg.baseUrl) {
     for (const cand of [info.linkUrl, info.pageUrl]) {
@@ -148,24 +140,25 @@ async function resolveMenuTarget(cfg, info) {
       if (kind === 'supported' || kind === 'blind') return cand;
     }
   }
-  // A data: or blob: image has no URL monloader can fetch, and a data: body
-  // would carry the whole payload over for a certain rejection.
+  // Filtered here: a data: URL would carry its whole payload to a sure refusal.
   return /^https?:/i.test(info.srcUrl || '') ? info.srcUrl : null;
 }
 
-// The context menu exposes only the rendered srcUrl, so a responsive image
-// yields its downscaled variant. Look the clicked image up in the page, under
-// the gesture's activeTab grant, and apply the scan's own rule to it: the two
-// paths would otherwise each carry a copy of it and drift. A func: body cannot
-// close over module scope, so scan-core is injected by file first - both calls
-// land in the same isolated world, so the namespace is there for the second.
-// Fall back to the rendered URL on any miss.
-async function largestForSrc(tabId, frameId, srcUrl) {
+// A func: body cannot close over module scope, so the modules it calls are
+// injected by file first, into the same isolated world.
+async function injectThen(tabId, frameId, { files, args, func }) {
   const target = frameId != null ? { tabId, frameIds: [frameId] } : { tabId };
+  await browser.scripting.executeScript({ target, files });
+  const [res] = await browser.scripting.executeScript({ target, args, func });
+  return res && res.result;
+}
+
+// srcUrl is the rendered, often downscaled, variant. Any failure falls
+// back to srcUrl.
+async function largestForSrc(tabId, frameId, srcUrl) {
   try {
-    await browser.scripting.executeScript({ target, files: ['lib/urls.js', 'lib/scan-core.js'] });
-    const [res] = await browser.scripting.executeScript({
-      target,
+    const up = await injectThen(tabId, frameId, {
+      files: ['lib/urls.js', 'lib/scan-core.js'],
       args: [srcUrl],
       func: (want) => {
         for (const img of document.querySelectorAll('img')) {
@@ -176,27 +169,20 @@ async function largestForSrc(tabId, frameId, srcUrl) {
         return null;
       }
     });
-    const up = res && res.result;
     return (typeof up === 'string' && /^https?:/i.test(up)) ? up : srcUrl;
   } catch (e) { return srcUrl; }
 }
 
-// A short-lived toast next to the clicked image, offering to narrow a page
-// send to the pointed file. Injected under the same gesture's activeTab grant
-// like the scan: the module is loaded by file, then called, since a func: body
-// cannot close over module scope.
 const TOAST_MS = 6000;
 
+// A toast that cannot be shown reads as one left alone: the page send stands.
 async function toastForChoice(tabId, frameId, srcUrl) {
-  const target = frameId != null ? { tabId, frameIds: [frameId] } : { tabId };
   try {
-    await browser.scripting.executeScript({ target, files: ['lib/toast.js'] });
-    const [res] = await browser.scripting.executeScript({
-      target,
+    return await injectThen(tabId, frameId, {
+      files: ['lib/toast.js'],
       args: [srcUrl, TOAST_MS],
       func: (url, ttl) => self.ML.toast.show(url, ttl)
     });
-    return res && res.result;
   } catch (e) { return null; }
 }
 
@@ -206,18 +192,21 @@ async function onMenuClick(info, tab) {
   const cfg = ML.send.cfgOf(s);
   let target = await resolveMenuTarget(cfg, info);
   if (!target) return reportUnsupported();
-  // A raw-file send carries the page it sat on, so monloader can record a
-  // source a person can revisit instead of the bare file URL.
   const file = target === info.srcUrl;
   if (s.baseUrl && tab && file) target = await largestForSrc(tab.id, info.frameId, info.srcUrl);
-  if (s.baseUrl && tab && !file && target === info.pageUrl && info.srcUrl) {
-    // The page won but the pointer sat on an image. Send without ?wait so the
-    // job id is in hand (and cancelable) while the toast is up; the badge and
-    // the "mine" ring wait for the choice, so a canceled job never counts.
+  if (s.baseUrl && tab && !file && target === info.pageUrl && /^https?:/i.test(info.srcUrl || '')) {
+    // No ?wait, so the job id is in hand to cancel while the toast is up.
+    // Recording waits for the choice, so a canceled job never counts.
     const out = await ML.send.sendOne(target, { wait: 0 });
     if (!out || !out.jobId) return recordSend(out);
     if ((await toastForChoice(tab.id, info.frameId, info.srcUrl)) !== 'image') return recordSend(out);
-    await ML.api.remove(cfg, out.jobId);
+    // monloader's DELETE removes a finished job instead of canceling it, so
+    // only a job still waiting or running is narrowed, and only a cancel
+    // that took is followed by the file.
+    const job = await ML.api.getJob(cfg, out.jobId);
+    const settled = job.ok && job.data && job.data.status !== 'queued' && job.data.status !== 'running';
+    if (settled) return recordSend(Object.assign({}, out, { outcome: ML.outcome.jobLine(job.data) }));
+    if (!job.ok || !(await ML.api.remove(cfg, out.jobId)).ok) return recordSend(out);
     const up = await largestForSrc(tab.id, info.frameId, info.srcUrl);
     await sendUrl(up, { options: { pageUrl: info.pageUrl } });
     return;

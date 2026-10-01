@@ -5,8 +5,8 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  // monloader's stable error_code vocabulary -> short actionable phrases.
-  // Never invent codes.
+  // Keys are monloader's error_code values; never invent one. Exported for
+  // the tests, which hold the table to monloader's whole vocabulary.
   const ERROR_PHRASES = {
     unsupported_url: 'not a supported site (no extractor)',
     auth_required: 'needs login/cookies for this site (set in monloader)',
@@ -39,12 +39,10 @@
     return hit ? hit[field] : null;
   }
 
-  // Map a resolved single-send job to one line. job === null means
-  // the wait timed out (202): the caller shows "queued" and polls.
   function singleOutcome(job) {
     if (!job) return { kind: 'queued', text: 'queued', tone: 'accent' };
     const s = job.summary || {};
-    if ((s.total === 0 || !s.total) && job.error_code && !(s.created || s.duplicate || s.skipped)) {
+    if (!s.total && job.error_code && !(s.created || s.duplicate || s.skipped)) {
       return { kind: 'failed', text: 'failed - ' + errorPhrase(job.error_code), tone: 'error' };
     }
     if ((s.created || 0) >= 1) {
@@ -62,22 +60,27 @@
     return { kind: 'done', text: 'nothing to add', tone: 'dim' };
   }
 
-  // One enqueue result -> a { kind, text, tone } line. A network failure and a
-  // 401 get their own kinds so no caller has to inspect the raw result.
-  function enqueueOutcome(result) {
+  // monloader's codes for an enqueue it refuses outright.
+  const REFUSALS = {
+    monbooru_unconfigured: 'monloader has no monbooru set up',
+    monbooru_paused: 'monloader\'s monbooru link is paused',
+    api_disabled: 'not paired yet - connect to monloader in options'
+  };
+
+  function enqueueOutcome(result, tokenHeld) {
     if (result.networkError || result.status === 0) {
       return { kind: 'down', text: 'monloader unreachable', tone: 'error' };
     }
     if (result.status === 401) {
-      return { kind: 'rejected', text: 'monloader rejected the token', tone: 'error' };
+      return tokenHeld ? { kind: 'rejected', text: 'monloader rejected the token', tone: 'error' }
+        : { kind: 'failed', text: REFUSALS.api_disabled, tone: 'error' };
     }
     if (result.status === 200) return singleOutcome(result.data);
-    if (result.status === 202) return singleOutcome(null); // wait timed out: the job is queued
-    return { kind: 'failed', text: 'send failed (HTTP ' + result.status + ')', tone: 'error' };
+    if (result.status === 202) return singleOutcome(null);
+    const refusal = REFUSALS[result.data && result.data.code];
+    return { kind: 'failed', text: refusal || 'send failed (HTTP ' + result.status + ')', tone: 'error' };
   }
 
-  // The whole kind vocabulary, as the action badge colors it: the job kinds
-  // above, the two transport kinds, and the send gate's 'unsupported'.
   const BADGE_COLOR = {
     created: '#22aa44', queued: '#5c6bc0',
     duplicate: '#6a6a82', skipped: '#6a6a82', canceled: '#6a6a82', done: '#6a6a82',
@@ -86,12 +89,8 @@
 
   function badgeColor(kind) { return BADGE_COLOR[kind] || BADGE_COLOR.queued; }
 
-  // Live progress for a running job, derived from the per-item status the queue
-  // exposes. The download pass is the slow part and advances each item to
-  // `downloaded` as its file lands, so count items that have left `pending`
-  // (downloaded, pushed, or terminally skipped/failed) rather than only the
-  // fully-finished ones, which would sit at 0 through the whole download.
-  // Empty until the resolve pass has populated the item list.
+  // Counts items past pending: the download pass moves each to
+  // `downloaded` as it lands, while a finished count sits at 0 throughout.
   function runningProgress(job) {
     const items = (job && job.items) || [];
     if (!items.length) return '';
@@ -99,10 +98,8 @@
     return moved + '/' + items.length;
   }
 
-  // One line for a queue job in any state, which singleOutcome alone cannot
-  // give: it reads a settled job, and lets `created` win over `failed`, which
-  // hides a partial's failures. A running or queued job says so with its
-  // progress, and a partial spells its counts out.
+  // Not singleOutcome alone: it lets `created` win over `failed`, hiding
+  // a partial's failures.
   function jobLine(job) {
     const j = job || {};
     if (j.status === 'running' || j.status === 'queued') {
@@ -115,8 +112,6 @@
     return singleOutcome(j);
   }
 
-  // The terse counts a queue row shows beside its status: nothing while it is
-  // queued, live progress while it runs, the outcome counts once it settles.
   function jobCounts(job) {
     const j = job || {};
     if (j.status === 'queued') return '';
@@ -124,22 +119,15 @@
     return queueSummary(j);
   }
 
-  // monloader's summary counts, in the order a row shows them. Both the row
-  // text and the series sum read this, so they cannot drift apart. The
-  // queue carries monbooru-driven jobs too (metadata, lookup, replace,
-  // ptr_lookup), so the set is the whole documented contract rather than
-  // the outcomes a monsender-initiated download produces.
+  // Key order is the order a row shows. The queue also carries
+  // monbooru-driven jobs, so their outcomes are here too.
   const COUNT_LABELS = {
     created: 'new', duplicate: 'dup', enriched: 'enrich', replaced: 'replace',
     matched: 'match', skipped: 'skip', archived: 'archived', failed: 'fail', canceled: 'cancel'
   };
 
-  // Terse per-row counts for a finished queue job: every nonzero outcome,
-  // so an all-skipped or partly-canceled job is not blank. A key monloader
-  // adds later still shows, under its own name, rather than vanishing until
-  // the label table catches up. `archived` is a subset of `skipped`, so it
-  // only prints when it is the whole of it - or when there is no `skipped`
-  // beside it to be part of.
+  // `archived` is part of `skipped`: it prints only when it is all of it
+  // or `skipped` is absent. Unknown keys show under their own name.
   function queueSummary(job) {
     const s = (job && job.summary) || {};
     let keys = Object.keys(s).filter((k) => k !== 'total' && typeof s[k] === 'number' && s[k] > 0);
@@ -148,7 +136,6 @@
     return keys.map((k) => s[k] + ' ' + (COUNT_LABELS[k] || k)).join(' ');
   }
 
-  // Documented keys lead in their table order; anything newer trails.
   const COUNT_ORDER = Object.keys(COUNT_LABELS);
   const order = (k) => (COUNT_ORDER.includes(k) ? COUNT_ORDER.indexOf(k) : COUNT_ORDER.length);
 
@@ -160,10 +147,8 @@
     return out;
   }
 
-  // Collapse a continue-series (a capped search and its continuations, which
-  // share `root`) into one entry: the newest window leads (the list is
-  // newest-first), with counts summed across the windows and the member ids so
-  // a row can act on the whole series. A standalone job is its own series.
+  // A capped search and its continuations share `root`. The list must be
+  // newest-first so the newest window leads.
   function groupSeries(jobs) {
     const groups = [];
     const at = new Map();
@@ -181,13 +166,12 @@
     return groups;
   }
 
-  // Map the connectivity probe to monloader's dot states. A monloader with no
-  // token configured answers 503 api_disabled on every authed endpoint, which
-  // is the state a user sits in between saving the URL and pairing: it is
-  // reachable, so neither "connected" nor "unreachable" is true of it.
-  function connState(healthResult, authedResult) {
+  // A monloader with no token set answers 503 api_disabled on every
+  // authed call, and one with tokens answers 401 to a client holding none:
+  // either way reachable, but not paired.
+  function connState(healthResult, authedResult, tokenHeld) {
     if (!healthResult || healthResult.networkError || healthResult.status === 0) return 'down';
-    if (authedResult && authedResult.status === 401) return 'rejected';
+    if (authedResult && authedResult.status === 401) return tokenHeld ? 'rejected' : 'unpaired';
     if (authedResult && authedResult.status === 503
         && authedResult.data && authedResult.data.code === 'api_disabled') return 'unpaired';
     if (healthResult.ok) return 'ok';

@@ -1,5 +1,4 @@
 'use strict';
-// CRC-32 (IEEE) shared by the zero-dependency ZIP and PNG writers.
 
 const CRC = (() => {
   const t = new Uint32Array(256);

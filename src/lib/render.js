@@ -8,13 +8,10 @@
   const G = typeof self !== 'undefined' ? self : globalThis;
   function ns() { return G.ML; }
 
-  // Build a chooser card for one scan result. The preview is an <img>, or a
-  // muted <video> for a video file; the URL is set with setAttribute and
-  // scanned strings via textContent, never innerHTML, so a hostile scan string
-  // can never become markup in the privileged panel.
+  // Scanned strings are page-controlled and this page is privileged:
+  // setAttribute and textContent only, never innerHTML.
 
   function shortUrl(u) {
-    if (/^data:/i.test(u)) return 'data: (inline)';
     try {
       const x = new URL(u);
       return x.hostname.replace(/^www\./, '') + '/.../' + (fileName(u) || x.hostname);
@@ -22,22 +19,18 @@
   }
 
   function fileExt(u) {
-    try {
-      const m = /\.([a-z0-9]{2,5})$/i.exec(new URL(u).pathname);
-      return m ? m[1].toLowerCase() : '';
-    } catch (e) { return ''; }
+    const m = /\.([a-z0-9]{2,5})$/i.exec(fileName(u));
+    return m ? m[1].toLowerCase() : '';
   }
 
+  // Decoded, as a person names the file; an escape that does not decode is
+  // shown as sent.
   function fileName(u) {
-    if (/^data:/i.test(u)) return 'data:';
-    try {
-      const parts = new URL(u).pathname.split('/').filter(Boolean);
-      return parts.length ? parts[parts.length - 1] : '';
-    } catch (e) { return ''; }
+    let last;
+    try { last = new URL(u).pathname.split('/').filter(Boolean).pop() || ''; } catch (e) { return ''; }
+    try { return decodeURIComponent(last); } catch (e) { return last; }
   }
 
-  // Shorten a long file name for the no-preview tile so it does not fill the
-  // card; keep the head and the extension, drop the middle.
   function trimName(name, max) {
     const s = String(name);
     max = max || 28;
@@ -47,33 +40,25 @@
     return s.slice(0, max - ext.length - 3) + '...' + ext;
   }
 
-  // Best-effort pixel width from a CDN URL that encodes one (.../1500x0/...,
-  // photo-1500x1000.jpg), so a variant with no srcset descriptor still shows its
-  // resolution instead of a bare "src". 0 when the URL carries no clear size.
+  // Widths a CDN puts in the URL: .../1500x0/... or photo-1500x1000.jpg.
   function urlWidth(u) {
     const s = String(u);
     const m = /\/(\d{3,5})x\d{1,5}\//.exec(s) || /[-_](\d{3,5})x\d{1,5}\.[a-z]/i.exec(s);
     return m ? +m[1] : 0;
   }
 
-  // The file name for the thumbnail placeholder, falling back to a plain word
-  // for a URL that carries none; the raw URL is in the meta line either way.
   function placeholderText(url, kind) {
     return trimName(fileName(url)) || (kind === 'video' ? 'video' : 'image');
   }
 
-  // The resolution the grid loads: the narrowest the item advertises, so a
-  // hundred-post gallery does not pull a hundred originals off third-party
-  // CDNs. The pick and the send target stay item.url.
+  // The narrowest variant, so a big gallery does not pull every original.
   function previewUrl(item) {
     let best = null;
     for (const v of item.variants || []) if (v.w && (!best || v.w < best.w)) best = v;
     return best ? best.url : item.url;
   }
 
-  // loading="lazy" holds an <img> back until it scrolls in; a <video> ignores
-  // it, so hold its src instead. Without an observer the load stays eager,
-  // which is the safe direction.
+  // A <video> ignores loading="lazy", so its src waits until it scrolls in.
   function whenVisible(doc, el, fn) {
     const IO = doc.defaultView && doc.defaultView.IntersectionObserver;
     if (!IO) { fn(); return; }
@@ -83,19 +68,14 @@
     io.observe(el);
   }
 
-  // The no-preview tile: the (trimmed) file name, prefixed with a "preview
-  // blocked" note when a load failed, so a host that blocks hotlinking reads
-  // differently from previews being turned off. It names the picked URL, since
-  // that is what the card will send. textContent only, so a scanned name can
-  // never become markup.
-  function fillNoPreview(doc, thumb, url, kind, blocked) {
+  function fillNoPreview(doc, thumb, url, kind, failed) {
     thumb.textContent = '';
     thumb.classList.add('noimg');
-    if (blocked) {
-      thumb.classList.add('blocked');
+    if (failed) {
+      thumb.classList.add('failed');
       const note = doc.createElement('div');
       note.className = 'phnote';
-      note.textContent = 'preview blocked';
+      note.textContent = 'preview failed';
       thumb.appendChild(note);
     }
     const name = doc.createElement('div');
@@ -118,9 +98,6 @@
     cb.setAttribute('data-url', item.url);
     cb.value = item.url;
 
-    // Dimensions start from the scanned size, then correct to the preview's own
-    // size once it loads, since a src/srcset variant can differ from the
-    // rendered image the scan measured.
     let ext = fileExt(item.url);
     let dim = null;
     function showDims(w, h) {
@@ -138,23 +115,19 @@
     let activeUrl = item.url;
     let shownUrl = null;
     function onLoad(w, h) {
-      // Both readings describe the picked file, so a thumbnail of some other
-      // resolution says nothing about them.
+      // A thumbnail of another resolution says nothing about the picked file.
       if (shownUrl !== activeUrl) return;
       showDims(w, h);
-      // The loaded width is authoritative, so a no-descriptor src stops reading
-      // "src" and shows its real resolution like the rest.
       if (activeSize && w) activeSize.textContent = w + 'w';
     }
 
-    // A failed load replaces the media element with the placeholder, so a later
-    // resolution pick has to rebuild the tile rather than repoint a node that is
-    // no longer in the tree.
+    // Rebuilt, not repointed: a failed load already swapped in the placeholder.
+    // A placeholder names activeUrl, not url: the file the card will send.
     function fillThumb(url) {
       shownUrl = url;
-      if (!opts.previews) { fillNoPreview(doc, thumb, url, item.kind, false); return; }
+      if (!opts.previews) { fillNoPreview(doc, thumb, activeUrl, item.kind, false); return; }
       thumb.textContent = '';
-      thumb.classList.remove('noimg', 'blocked');
+      thumb.classList.remove('noimg', 'failed');
       const video = item.kind === 'video';
       const el = doc.createElement(video ? 'video' : 'img');
       if (video) {
@@ -166,11 +139,8 @@
         el.setAttribute('alt', '');
         el.addEventListener('load', () => onLoad(el.naturalWidth, el.naturalHeight));
       }
-      // A hotlink-protected, stale, or undecodable URL leaves a blank tile; show
-      // it as blocked so the user sees why the preview is missing.
       el.addEventListener('error', () => fillNoPreview(doc, thumb, activeUrl, item.kind, true));
       thumb.appendChild(el);
-      // setAttribute, not innerHTML: never parsed as markup.
       if (video) whenVisible(doc, el, () => el.setAttribute('src', url));
       else el.setAttribute('src', url);
     }
@@ -187,9 +157,7 @@
     showDims(item.w, item.h);
     card.appendChild(label);
 
-    // One clickable token per resolution, outside the label so a click never
-    // toggles the pick. Choosing one repoints the pick and reloads the preview;
-    // onLoad then labels it with the real loaded width.
+    // Outside the label, or a click on a token would toggle the pick.
     if (item.variants && item.variants.length > 1) {
       const sizes = doc.createElement('div');
       sizes.className = 'sizes';
@@ -212,8 +180,7 @@
         cb.value = u;
         ext = fileExt(u);
         activeUrl = u;
-        // Drop the previous variant's size right away: only a load can supply
-        // the new one, and with previews off no load ever happens.
+        // Only a load can supply the new size; previews off never loads.
         showDims(0, 0);
         fillThumb(u);
       };

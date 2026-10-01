@@ -6,19 +6,15 @@
   let activeUrl = '';
   let activeTabId = null;
   let paused = false;
-  // The resting result line; hovering a queue row shows that job's message and
-  // reverts to this on leave.
   let baseResult = { text: '', tone: '' };
 
   function setResult(text, tone) {
     const r = $('result');
     r.textContent = text || '';
-    r.title = text || ''; // result is single-line + ellipsized; show the full text on hover
+    r.title = text || '';
     r.className = 'result' + (tone ? ' tone-' + tone : '');
   }
 
-  // The pause button mirrors monloader's global hold: indigo while downloads
-  // run, orange while held. It shows only when monloader is reachable.
   function setPause(isPaused) {
     paused = isPaused;
     const b = $('pause');
@@ -33,7 +29,7 @@
   async function togglePause() {
     const b = $('pause');
     b.disabled = true;
-    await (paused ? api.resume(cfg) : api.pause(cfg)).catch(() => {});
+    await (paused ? api.resume(cfg) : api.pause(cfg));
     b.disabled = false;
     poll();
   }
@@ -41,9 +37,6 @@
   async function init() {
     const s = await storage.getSettings();
     cfg = send.cfgOf(s);
-    // Clear the badge and the tooltip a no-popup send may have set. The result
-    // line starts empty; a queue job's outcome shows only while its row is
-    // hovered, or this popup's own send result.
     try { await browser.action.setTitle({ title: 'Send to monloader' }); } catch (e) { /* action API unavailable */ }
     try { await browser.action.setBadgeText({ text: '' }); } catch (e) { /* as above */ }
     try {
@@ -68,7 +61,6 @@
     poll();
   }
 
-  // What the queue area says when it has no jobs to show.
   const QUEUE_DOWN = {
     rejected: 'monloader rejected the token',
     unpaired: 'not paired yet - connect to monloader in options'
@@ -81,59 +73,79 @@
     unsupported: 'not a supported site or image'
   };
 
+  // A ?wait send can take a minute, and a second click would enqueue the
+  // page again.
+  let sending = false;
+
   async function hint() {
     $('scan').disabled = !activeUrl;
     if (!activeUrl) { $('hint').textContent = ''; $('send').disabled = true; return; }
     let kind;
     try { kind = await sites.sendKind(cfg, activeUrl); } catch (e) { kind = 'blind'; }
-    // 'blind' means the sites list could not be consulted, which says nothing
-    // about this page; 'unknown' means it was, and did not name the host.
+    // 'blind' gets no hint: an unreadable list says nothing about this page.
     $('hint').textContent = HINT[kind] || '';
-    // Block the send only when sure it is unsendable; an undecidable result
-    // (the sites list could not be fetched) leaves it enabled.
-    $('send').disabled = kind === 'unsupported';
+    // Only a positively unsendable page blocks the send.
+    $('send').disabled = sending || kind === 'unsupported';
   }
 
   async function doSend() {
-    if (!activeUrl) return;
-    setResult('sending...', 'dim');
-    const out = await send.sendOne(activeUrl);
-    if (!out.configured) { setResult('set monloader URL in options', 'error'); return; }
-    setResult(out.outcome.text, out.outcome.tone);
-    baseResult = { text: out.outcome.text, tone: out.outcome.tone };
-    if (out.jobId) await storage.addRecentJobIds([out.jobId]);
+    if (!activeUrl || sending) return;
+    sending = true;
+    $('send').disabled = true;
+    // The resting text while the send is out, so a poll repaints it.
+    baseResult = { text: 'sending...', tone: 'dim' };
+    setResult(baseResult.text, baseResult.tone);
+    try {
+      const out = await send.sendOne(activeUrl);
+      baseResult = out.configured ? { text: out.outcome.text, tone: out.outcome.tone }
+        : { text: 'set monloader URL in options', tone: 'error' };
+      setResult(baseResult.text, baseResult.tone);
+      if (out.jobId) await storage.addRecentJobIds([out.jobId]);
+    } finally {
+      sending = false;
+      hint();
+    }
     poll();
   }
 
-  // Open the chooser panel and kick off a scan. The scan itself runs in the
-  // background (bg.js): on Firefox sidebarAction.open() must fire synchronously
-  // in this gesture and dismisses the popup, so the popup cannot finish an async
-  // scan. Every call below is a synchronous dispatch, so they all land
-  // in-gesture - both engines refuse to open their panel otherwise, which is
-  // why the tab id is the one init() kept rather than a fresh query. The panel
-  // reads the result from storage.
+  // Both engines open their panel only inside the gesture, so nothing
+  // here may await, and the tab id is the one init() kept. Opening the
+  // Firefox sidebar closes the popup, so the scan runs in the background.
   function doScan() {
-    if (browser.sidebarAction && browser.sidebarAction.open) browser.sidebarAction.open().catch(() => {});
-    browser.runtime.sendMessage({ type: 'scan' }).catch(() => {});
-    // Chrome only; sidePanel is reached dynamically so the Firefox bundle never
-    // statically references the Chrome-only API (web-ext UNSUPPORTED_API).
+    if (browser.sidebarAction && browser.sidebarAction.open) browser.sidebarAction.open().catch(() => { /* refused: the user opens it */ });
+    browser.runtime.sendMessage({ type: 'scan' }).catch(() => { /* the popup closes next; nothing could show it */ });
+    // Bracket access keeps web-ext's UNSUPPORTED_API off the Firefox build.
     const sp = globalThis.chrome && globalThis.chrome['sidePanel'];
     if (sp && sp.open && activeTabId != null) {
-      try { sp.open({ tabId: activeTabId }).catch(() => {}); } catch (e) { /* refused: the user opens it */ }
+      try { sp.open({ tabId: activeTabId }).catch(() => { /* refused: the user opens it */ }); } catch (e) { /* as above */ }
     }
     window.close();
   }
 
-  // Chain each poll off the end of the last rather than on a fixed interval:
-  // against a monloader that answers slowly, an interval stacks calls faster
-  // than they come back.
+  // Chained, not setInterval: a slow monloader would stack polls up.
   let pollTimer = null;
+
+  const ROWS = 8;
+  // A row sums every window of its series, so the page grows to the API's
+  // 200 once a series runs past it or leaves fewer rows than the popup shows.
+  let pageSize = ROWS;
+
+  function cutShort(r) {
+    const jobs = (r.ok && r.data && Array.isArray(r.data.jobs)) ? r.data.jobs : [];
+    if (jobs.length < pageSize) return false;
+    const groups = outcome.groupSeries(jobs);
+    return groups.length < ROWS || groups.slice(0, ROWS).some((g) => !g.members.includes(rootOf(g)));
+  }
 
   async function poll() {
     clearTimeout(pollTimer);
     try {
-      const r = await api.listQueue(cfg, { limit: 8 });
-      const st = outcome.connState(r, r);
+      let r = await api.listQueue(cfg, { limit: pageSize });
+      if (pageSize < 200 && cutShort(r)) {
+        pageSize = 200;
+        r = await api.listQueue(cfg, { limit: pageSize });
+      }
+      const st = outcome.connState(r, r, !!cfg.token);
       ui.setConn(st, ui.connLabel(st));
       if (r.ok && r.data && Array.isArray(r.data.jobs)) {
         setPause(!!r.data.paused);
@@ -143,19 +155,14 @@
         hidePause();
         queueState(QUEUE_DOWN[st] || 'cannot reach monloader');
       }
-      // A hovered row is showing its own message; leave it be until mouseleave.
       if (!document.querySelector('.qrow:hover')) setResult(baseResult.text, baseResult.tone);
     } finally {
       pollTimer = setTimeout(poll, 2000);
     }
   }
 
-  // Queue actions render as clickable bracketed text ([retry] etc.), not
-  // buttons. The queue only visibly changes on the next poll, so a second
-  // click lands before there is anything to show for the first - and on a
-  // capped row that costs a second window of downloads. The in-flight set is
-  // keyed by row and label rather than held on the node, since a status change
-  // rebuilds the action row under it.
+  // A double click would cost a capped row a second window. Keyed by row and
+  // label, not held on the node: a status change rebuilds the action row.
   const inFlight = new Set();
 
   function qact(id, label, title, request) {
@@ -182,9 +189,8 @@
     a.className = 'qactions';
     const id = j.id;
     if (j.status === 'running' || j.status === 'queued') {
-      a.appendChild(qact(id, 'cancel', 'cancel this job', () => removeSeries(id)));
+      a.appendChild(qact(id, 'cancel', 'cancel this job', () => cancelSeries(id)));
     } else {
-      // A capped search only fetched its newest window; offer the next, or all.
       if (j.capped && j.status !== 'failed' && j.status !== 'canceled') {
         a.appendChild(qact(id, 'continue', 'fetch the next items past the cap', () => api.continueJob(cfg, id)));
         a.appendChild(qact(id, 'fetch all', 'keep fetching until the search runs out', () => api.continueAll(cfg, id)));
@@ -192,13 +198,9 @@
       if (j.status !== 'succeeded') {
         a.appendChild(qact(id, 'retry', 'requeue, keeping the gallery-dl archive', () => api.retry(cfg, id, false)));
       }
-      // A plain retry keeps the archive, so a skipped-archive item only
-      // re-downloads when forced. `archived` is the archive half of
-      // `skipped`, and the only half forcing can fetch again: gating on
-      // `skipped` also catches skipped_unsupported, where the re-run costs
-      // a booru a full refetch and skips the same items for the same
-      // reason. `skipped` is the fallback for a monloader older than the
-      // field.
+      // Gated on `archived`, the only part of `skipped` that forcing can
+      // fetch again: skipped_unsupported would refetch just to skip the same
+      // items. A monloader without the field falls back to `skipped`.
       if (j.summary && (j.summary.archived > 0
           || (j.summary.archived === undefined && j.summary.skipped > 0))) {
         a.appendChild(qact(id, 'force download', 're-download, ignoring the gallery-dl archive', () => api.retry(cfg, id, true)));
@@ -207,13 +209,29 @@
     return a;
   }
 
-  // The cancel action acts on a whole collapsed series: monloader's per-job
-  // DELETE cancels a running window and drops the rest, so loop it. The member
-  // list is read now, not when the row was built: a series can gain a window
-  // between the two.
-  function removeSeries(id) {
-    const j = shown.get(String(id)) || { id, members: [id] };
-    return Promise.all((j.members || [j.id]).map((m) => api.remove(cfg, m)));
+  // monloader's DELETE acts on a whole series: sent to a live window it
+  // cancels every live one and keeps the finished ones, sent to a finished
+  // window it removes them all. A window can finish between the poll and
+  // the click, so the series is read fresh and one of its live windows gets
+  // the DELETE.
+  async function cancelSeries(id) {
+    const root = rootOf(shown.get(String(id)) || { id });
+    const live = (await wholeQueue()).find((j) => rootOf(j) === root && !finished(j));
+    if (live) await api.remove(cfg, live.id);
+  }
+
+  const rootOf = (j) => j.root || j.id;
+
+  // A page holds at most 200 jobs.
+  async function wholeQueue() {
+    const jobs = [];
+    for (let page = 1; ; page++) {
+      const r = await api.listQueue(cfg, { limit: 200, page });
+      if (!(r.ok && r.data && Array.isArray(r.data.jobs))) break;
+      jobs.push(...r.data.jobs);
+      if (r.data.jobs.length < 200 || jobs.length >= r.data.total) break;
+    }
+    return jobs;
   }
 
   function queueState(msg) {
@@ -228,8 +246,7 @@
 
   function setClearEnabled(on) { ui.setActionEnabled($('clearQueue'), on && !clearing); }
 
-  // The job behind each visible row, by id, refreshed every poll. The row's
-  // handlers read it rather than closing over the job they were built from.
+  // Row handlers read this, not a closed-over job: rows outlive their poll.
   let shown = new Map();
 
   function newRow(id) {
@@ -265,17 +282,16 @@
     site.textContent = (j.site || sites.hostOf(j.url)) + (j.gallery ? ' / ' + j.gallery : '');
     site.title = j.url || '';
     sum.textContent = outcome.jobCounts(j);
-    // Only swap the actions when the set itself changes, so a focused or
-    // in-flight control survives every poll that leaves the row's offer alone.
+    // Swapped only when the offer changes, so a focused control survives.
     const next = qactions(j);
     if (actionLabels(next) !== actionLabels(row.lastChild)) row.replaceChild(next, row.lastChild);
   }
 
-  // Patch the rows in place rather than clearing #queue: a teardown every 2 s
-  // takes the keyboard off a focused action, eats a click that spans it, and
-  // swallows the mouseleave of a hovered row.
+  // Patched in place: a rebuild every 2 s drops focus, eats a click in
+  // progress and loses a hovered row's mouseleave.
   function renderQueue(jobs, mine) {
-    const groups = outcome.groupSeries(jobs);
+    const all = outcome.groupSeries(jobs);
+    const groups = all.slice(0, ROWS);
     if (!groups.length) { queueState('queue is empty'); return; }
     const q = $('queue');
     if (q.firstChild && q.firstChild.className === 'empty') q.textContent = '';
@@ -289,23 +305,20 @@
       const row = spare.get(key) || newRow(j.id);
       spare.delete(key);
       updateRow(row, j, mine);
-      // Re-inserting a node blurs what is focused inside it, so move only a row
-      // that is actually out of place.
+      // Re-inserting blurs a focused control, so only a misplaced row moves.
       if (q.children[at] !== row) q.insertBefore(row, q.children[at] || null);
       at++;
     }
     for (const row of spare.values()) row.remove();
-    setClearEnabled(groups.some(finished));
+    setClearEnabled(all.some(finished));
   }
 
-  function finished(j) { return ['succeeded', 'partial', 'failed', 'canceled'].indexOf(j.status) !== -1; }
+  function finished(j) { return ['succeeded', 'partial', 'failed', 'canceled', 'interrupted'].indexOf(j.status) !== -1; }
 
-  // Clear every finished job in monloader's queue - not just the rows on
-  // screen, which is why the control says so. The API has no bulk-clear, so
-  // loop DELETE; running and queued jobs are left alone, matching monloader's
-  // own queue "clear". The pass owns the control for its whole duration: the
-  // poll recomputes the enabled state from the queue contents, and would
-  // otherwise re-offer it mid-pass and let a second click run a concurrent one.
+  // The API has no bulk clear, and its DELETE removes a finished series
+  // whole but cancels any window of it still live. So each finished series
+  // gets one DELETE and a series with a live window is left alone. The flag
+  // holds the control for the pass; a poll would re-offer it.
   let clearing = false;
 
   async function clearQueue() {
@@ -313,18 +326,19 @@
     setClearEnabled(false);
     const prev = baseResult;
     try {
-      const r = await api.listQueue(cfg, { limit: 200 });
-      const done = (r.ok && r.data && Array.isArray(r.data.jobs)) ? r.data.jobs.filter(finished) : [];
-      for (let i = 0; i < done.length; i++) {
-        // The poll rewrites the result line every 2 s, so progress has to be
-        // the resting text rather than a one-shot message.
-        baseResult = { text: 'clearing ' + (i + 1) + ' of ' + done.length + '...', tone: 'dim' };
+      const jobs = await wholeQueue();
+      const live = new Set(jobs.filter((j) => !finished(j)).map(rootOf));
+      const done = new Map();
+      for (const j of jobs) if (finished(j) && !live.has(rootOf(j))) done.set(rootOf(j), j.id);
+      const ids = [...done.values()];
+      for (let i = 0; i < ids.length; i++) {
+        // Progress is the resting text: each poll repaints the line from it.
+        baseResult = { text: 'clearing ' + (i + 1) + ' of ' + ids.length + '...', tone: 'dim' };
         setResult(baseResult.text, baseResult.tone);
-        try { await api.remove(cfg, done[i].id); } catch (e) { /* a job gone already is cleared */ }
+        await api.remove(cfg, ids[i]);
       }
     } finally {
-      // A send that landed during the pass wrote its own outcome; only our own
-      // progress line is ours to take back.
+      // A send during the pass set its own outcome, which must stand.
       if (/^clearing /.test(baseResult.text)) baseResult = prev;
       setResult(baseResult.text, baseResult.tone);
       clearing = false;
@@ -334,7 +348,10 @@
 
   $('send').addEventListener('click', doSend);
   $('scan').addEventListener('click', doScan);
-  $('options').addEventListener('click', () => { browser.runtime.openOptionsPage(); window.close(); });
+  $('options').addEventListener('click', () => {
+    browser.runtime.openOptionsPage().catch(() => { /* the popup closes next; nothing could show it */ });
+    window.close();
+  });
   $('pause').addEventListener('click', togglePause);
   ui.onActivate($('brand'), () => ui.openQueue(cfg, true));
   ui.onActivate($('clearQueue'), clearQueue);

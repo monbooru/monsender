@@ -1,6 +1,5 @@
 body { width: 360px; padding: 10px; }
 
-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .hleft { display: flex; align-items: center; gap: 10px; }
 
 .pause-btn { width: 32px; padding: 4px 0; font-size: 16px; line-height: 16px; color: var(--accent); border-color: var(--accent); }
@@ -10,7 +9,6 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 
 #target { background: var(--bg-input); border: 1px solid var(--border); padding: 6px 8px; margin-bottom: 8px; }
 #target .targetrow { display: flex; align-items: baseline; gap: 6px; }
-#target .prompt { flex: 0 0 auto; color: var(--accent); font-weight: bold; }
 #target .target { flex: 1; min-width: 0; color: var(--fg); }
 #target .hint { margin-top: 2px; }
 

@@ -1,7 +1,6 @@
 'use strict';
-// Minimal, dependency-free ZIP writer (deflate) so the build produces the
-// Chrome .zip and Firefox .xpi without any image/zip tooling. Reproducible:
-// a fixed DOS timestamp, files sorted by path.
+// Reproducible: a fixed DOS timestamp and path-sorted entries give the
+// same bytes every run.
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
