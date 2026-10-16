@@ -25,6 +25,7 @@
     ok: 'connected',
     rejected: 'token rejected',
     unpaired: 'not paired yet',
+    setup: 'setup not finished',
     down: 'unreachable'
   };
 

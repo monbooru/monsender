@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "monsender",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Send the current page or its images to the download queue of the monloader server you run.",
   "homepage_url": "https://github.com/monbooru/monsender",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus"],

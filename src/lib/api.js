@@ -53,7 +53,8 @@
   function cleanOptions(o) {
     const out = {};
     if (o.maxItems) out.max_items = Number(o.maxItems);
-    if (o.pageUrl) out.page_url = o.pageUrl;
+    // monloader refuses a whole send whose page_url is not http(s).
+    if (o.pageUrl && /^https?:/i.test(o.pageUrl)) out.page_url = o.pageUrl;
     return out;
   }
 
@@ -86,6 +87,7 @@
   const remove = (cfg, id) => call(cfg, 'DELETE', '/api/v1/queue/' + id);
   const pause = (cfg) => call(cfg, 'POST', '/api/v1/queue/pause');
   const resume = (cfg) => call(cfg, 'POST', '/api/v1/queue/resume');
+  const pairRemove = (cfg) => call(cfg, 'POST', '/api/v1/pair/remove');
 
   async function health(cfg) {
     return req(base(cfg) + '/health', { headers: {} });
@@ -109,5 +111,5 @@
     return req(base(cfg) + '/api/v1/pair/status?id=' + encodeURIComponent(id), { headers: {} });
   }
 
-  return { enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus, sleep };
+  return { enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus, pairRemove, sleep };
 });

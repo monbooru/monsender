@@ -39,6 +39,10 @@
     return hit ? hit[field] : null;
   }
 
+  function isArchiveSkip(s) {
+    return !!s && (s.archived > 0 || (s.archived === undefined && s.skipped > 0));
+  }
+
   function singleOutcome(job) {
     if (!job) return { kind: 'queued', text: 'queued', tone: 'accent' };
     const s = job.summary || {};
@@ -51,7 +55,8 @@
       return { kind: 'created', text: id ? 'added -> monbooru #' + id : 'added', tone: 'success' };
     }
     if ((s.duplicate || 0) >= 1) return { kind: 'duplicate', text: 'already in your library', tone: 'dim' };
-    if ((s.skipped || 0) >= 1) return { kind: 'skipped', text: 'already fetched (archive)', tone: 'dim' };
+    if (isArchiveSkip(s)) return { kind: 'skipped', text: 'already fetched (archive)', tone: 'dim' };
+    if ((s.skipped || 0) >= 1) return { kind: 'skipped', text: ERROR_PHRASES.wrong_type, tone: 'dim' };
     if ((s.failed || 0) >= 1) {
       const code = firstItemField(job, 'error_code') || job.error_code;
       return { kind: 'failed', text: 'failed - ' + errorPhrase(code), tone: 'error' };
@@ -64,7 +69,8 @@
   const REFUSALS = {
     monbooru_unconfigured: 'monloader has no monbooru set up',
     monbooru_paused: 'monloader\'s monbooru link is paused',
-    api_disabled: 'not paired yet - connect to monloader in options'
+    api_disabled: 'not paired yet - connect to monloader in options',
+    setup_required: 'monloader\'s first-run setup is not finished'
   };
 
   function enqueueOutcome(result, tokenHeld) {
@@ -83,8 +89,9 @@
 
   const BADGE_COLOR = {
     created: '#22aa44', queued: '#5c6bc0',
-    duplicate: '#6a6a82', skipped: '#6a6a82', canceled: '#6a6a82', done: '#6a6a82',
-    failed: '#cc3333', unsupported: '#cc3333', down: '#cc3333', rejected: '#cc3333'
+    duplicate: '#8888a0', skipped: '#8888a0', canceled: '#8888a0', done: '#8888a0',
+    failed: '#cc3333', unsupported: '#cc3333', down: '#cc3333', rejected: '#cc3333',
+    partial: '#ffaa00', interrupted: '#ffaa00'
   };
 
   function badgeColor(kind) { return BADGE_COLOR[kind] || BADGE_COLOR.queued; }
@@ -108,6 +115,9 @@
     }
     if (j.status === 'partial') {
       return { kind: 'partial', text: queueSummary(j) || 'partial', tone: 'warning' };
+    }
+    if (j.status === 'interrupted' && !(j.summary && j.summary.total)) {
+      return { kind: 'interrupted', text: 'interrupted - contents unknown', tone: 'warning' };
     }
     return singleOutcome(j);
   }
@@ -168,15 +178,18 @@
 
   // A monloader with no token set answers 503 api_disabled on every
   // authed call, and one with tokens answers 401 to a client holding none:
-  // either way reachable, but not paired.
+  // either way reachable, but not paired. A desktop monloader still in its
+  // first-run setup answers 409 setup_required to every API call.
   function connState(healthResult, authedResult, tokenHeld) {
     if (!healthResult || healthResult.networkError || healthResult.status === 0) return 'down';
     if (authedResult && authedResult.status === 401) return tokenHeld ? 'rejected' : 'unpaired';
     if (authedResult && authedResult.status === 503
         && authedResult.data && authedResult.data.code === 'api_disabled') return 'unpaired';
+    if (authedResult && authedResult.status === 409
+        && authedResult.data && authedResult.data.code === 'setup_required') return 'setup';
     if (healthResult.ok) return 'ok';
     return 'down';
   }
 
-  return { ERROR_PHRASES, singleOutcome, enqueueOutcome, jobLine, jobCounts, badgeColor, runningProgress, queueSummary, groupSeries, connState };
+  return { ERROR_PHRASES, isArchiveSkip, singleOutcome, enqueueOutcome, jobLine, jobCounts, badgeColor, runningProgress, queueSummary, groupSeries, connState };
 });

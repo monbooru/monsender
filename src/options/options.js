@@ -77,7 +77,11 @@
     let cleared = false;
     if (lastSavedUrl && lastSavedUrl !== url) {
       const cur = await storage.getSettings();
-      if (cur.token) { patch.token = ''; cleared = true; }
+      if (cur.token) {
+        patch.token = '';
+        cleared = true;
+        api.pairRemove({ baseUrl: lastSavedUrl, token: cur.token });
+      }
     }
     const saved = await storage.setSettings(patch);
     lastSavedUrl = saved.baseUrl;
@@ -111,6 +115,7 @@
         await sleep(1500);
         if (job.canceled) { setFlash('pairing canceled', 'flash-warn'); return; }
         const st = await api.pairStatus(cfg, id);
+        if (st.status === 404) { setFlash('pairing request expired; connect again', 'flash-err'); return; }
         if (!st.ok || !st.data) continue;
         if (st.data.status === 'approved' && st.data.token) {
           const saved = await storage.setSettings({ baseUrl: url, token: st.data.token });
@@ -121,7 +126,6 @@
           return;
         }
         if (st.data.status === 'denied') { setFlash('pairing was denied in monloader', 'flash-err'); return; }
-        if (st.data.status === 'expired') { setFlash('pairing request expired; try again', 'flash-err'); return; }
       }
       setFlash('timed out waiting for approval; try again', 'flash-err');
     } finally {

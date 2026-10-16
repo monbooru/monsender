@@ -63,7 +63,8 @@
 
   const QUEUE_DOWN = {
     rejected: 'monloader rejected the token',
-    unpaired: 'not paired yet - connect to monloader in options'
+    unpaired: 'not paired yet - connect to monloader in options',
+    setup: 'monloader\'s first-run setup is not finished'
   };
 
   const HINT = {
@@ -198,11 +199,9 @@
       if (j.status !== 'succeeded') {
         a.appendChild(qact(id, 'retry', 'requeue, keeping the gallery-dl archive', () => api.retry(cfg, id, false)));
       }
-      // Gated on `archived`, the only part of `skipped` that forcing can
-      // fetch again: skipped_unsupported would refetch just to skip the same
-      // items. A monloader without the field falls back to `skipped`.
-      if (j.summary && (j.summary.archived > 0
-          || (j.summary.archived === undefined && j.summary.skipped > 0))) {
+      // Not on any skip: skipped_unsupported would refetch just to skip the
+      // same items.
+      if (outcome.isArchiveSkip(j.summary)) {
         a.appendChild(qact(id, 'force download', 're-download, ignoring the gallery-dl archive', () => api.retry(cfg, id, true)));
       }
     }
