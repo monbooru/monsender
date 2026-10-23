@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.4.3] - 2026-10-23
+### Changed
+- Colours follow monloader's new palette.
+- The popup's pause control reads [pause] or [resume], as monloader's does.
+
+### Fixed
+- Enriched, replaced or matched jobs show that outcome in green, not "nothing to add".
+- A collapsed series shows its worst window's status, and continue resumes the newest capped window.
+
 ## [v1.4.2] - 2026-10-16
 ### Fixed
 - A file monbooru cannot take reads "monbooru does not take this file type", not an archive hit.

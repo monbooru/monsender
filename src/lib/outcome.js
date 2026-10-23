@@ -54,6 +54,9 @@
       const id = firstItemField(job, 'monbooru_id');
       return { kind: 'created', text: id ? 'added -> monbooru #' + id : 'added', tone: 'success' };
     }
+    if ((s.replaced || 0) >= 1) return { kind: 'replaced', text: 'replaced', tone: 'success' };
+    if ((s.enriched || 0) >= 1) return { kind: 'enriched', text: 'enriched', tone: 'success' };
+    if ((s.matched || 0) >= 1) return { kind: 'matched', text: 'matched', tone: 'success' };
     if ((s.duplicate || 0) >= 1) return { kind: 'duplicate', text: 'already in your library', tone: 'dim' };
     if (isArchiveSkip(s)) return { kind: 'skipped', text: 'already fetched (archive)', tone: 'dim' };
     if ((s.skipped || 0) >= 1) return { kind: 'skipped', text: ERROR_PHRASES.wrong_type, tone: 'dim' };
@@ -88,10 +91,10 @@
   }
 
   const BADGE_COLOR = {
-    created: '#22aa44', queued: '#5c6bc0',
+    created: '#7fc99a', enriched: '#7fc99a', replaced: '#7fc99a', matched: '#7fc99a', queued: '#9fa8da',
     duplicate: '#8888a0', skipped: '#8888a0', canceled: '#8888a0', done: '#8888a0',
-    failed: '#cc3333', unsupported: '#cc3333', down: '#cc3333', rejected: '#cc3333',
-    partial: '#ffaa00', interrupted: '#ffaa00'
+    failed: '#ef8f99', unsupported: '#ef8f99', down: '#ef8f99', rejected: '#ef8f99',
+    partial: '#e8c06a', interrupted: '#e8c06a'
   };
 
   function badgeColor(kind) { return BADGE_COLOR[kind] || BADGE_COLOR.queued; }
@@ -157,6 +160,10 @@
     return out;
   }
 
+  const STATUS_RANK = ['running', 'queued', 'failed', 'partial', 'interrupted', 'canceled'];
+  const rank = (st) => (STATUS_RANK.includes(st) ? STATUS_RANK.indexOf(st) : STATUS_RANK.length);
+  const continuable = (j) => !!j.capped && j.status !== 'failed' && j.status !== 'canceled';
+
   // A capped search and its continuations share `root`. The list must be
   // newest-first so the newest window leads.
   function groupSeries(jobs) {
@@ -168,9 +175,12 @@
         const g = groups[at.get(root)];
         g.summary = addSummary(g.summary, j.summary);
         g.members.push(j.id);
+        if (rank(j.status) < rank(g.status)) { g.status = j.status; g.worstId = j.id; }
+        if (continuable(j) && (g.continueId == null || j.id > g.continueId)) g.continueId = j.id;
       } else {
         at.set(root, groups.length);
-        groups.push(Object.assign({}, j, { summary: addSummary({}, j.summary), members: [j.id] }));
+        groups.push(Object.assign({}, j, { summary: addSummary({}, j.summary), members: [j.id],
+          worstId: j.id, continueId: continuable(j) ? j.id : null }));
       }
     }
     return groups;

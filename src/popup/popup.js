@@ -20,7 +20,7 @@
     const b = $('pause');
     b.hidden = false;
     b.classList.toggle('paused', isPaused);
-    b.textContent = isPaused ? '\u25B6\uFE0E' : '\u23F8\uFE0E';
+    b.textContent = isPaused ? '[\u25B6\uFE0E resume]' : '[\u23F8\uFE0E pause]';
     b.setAttribute('aria-label', isPaused ? 'resume downloads' : 'pause downloads');
     b.title = isPaused ? 'downloads paused - click to resume' : 'pause new downloads';
   }
@@ -192,12 +192,13 @@
     if (j.status === 'running' || j.status === 'queued') {
       a.appendChild(qact(id, 'cancel', 'cancel this job', () => cancelSeries(id)));
     } else {
-      if (j.capped && j.status !== 'failed' && j.status !== 'canceled') {
-        a.appendChild(qact(id, 'continue', 'fetch the next items past the cap', () => api.continueJob(cfg, id)));
-        a.appendChild(qact(id, 'fetch all', 'keep fetching until the search runs out', () => api.continueAll(cfg, id)));
+      const next = j.continueId;
+      if (next != null) {
+        a.appendChild(qact(next, 'continue', 'fetch the next items past the cap', () => api.continueJob(cfg, next)));
+        a.appendChild(qact(next, 'fetch all', 'keep fetching until the search runs out', () => api.continueAll(cfg, next)));
       }
       if (j.status !== 'succeeded') {
-        a.appendChild(qact(id, 'retry', 'requeue, keeping the gallery-dl archive', () => api.retry(cfg, id, false)));
+        a.appendChild(qact(j.worstId, 'retry', 'requeue, keeping the gallery-dl archive', () => api.retry(cfg, j.worstId, false)));
       }
       // Not on any skip: skipped_unsupported would refetch just to skip the
       // same items.

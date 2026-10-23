@@ -14,7 +14,7 @@
     const el = $('conn');
     el.textContent = '';
     const dot = document.createElement('span');
-    dot.className = 'dot dot-' + state;
+    dot.className = 'footer-dot footer-dot-' + state;
     const txt = document.createElement('span');
     txt.textContent = ' ' + label;
     el.appendChild(dot);

@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg:         #0d0d0d;
   --bg-surface: #16161c;
   --bg-input:   #111118;
@@ -6,16 +7,21 @@
   --fg:         #e2e2e8;
   --fg-dim:     #8888a0;
   --accent:     #5c6bc0;
-  --success:    #22aa44;
-  --warning:    #ffaa00;
-  --error:      #cc3333;
-  /* No rule reads these; they stay to mirror monloader's palette. */
-  --cat-general:   #3d90e3;
-  --cat-character: #00aa00;
-  --cat-artist:    #cc0000;
-  --cat-copyright: #aa00aa;
-  --cat-meta:      #ffaa00;
-  --cat-species:   #ed5d1f;
+  --link:       #9fa8da;
+  --success:    #7fc99a;
+  --warning:    #e8c06a;
+  --error:      #ef8f99;
+  --monbooru:   #ef8f99;
+  --peer:       var(--monbooru);
+  --danger:     #9d2235;
+  --on-danger:  var(--fg);
+  --scrim:      #000;
+  --font-mono:  "JetBrains Mono", "Fira Mono", "Courier New", monospace;
+  --heat-0:     #1b1b25;
+  --heat-1:     #4a5595;
+  --heat-2:     var(--accent);
+  --heat-3:     #7583d8;
+  --heat-4:     #93a0ef;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,12 +29,12 @@
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: "JetBrains Mono", "Fira Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.5;
 }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 button, input, select, textarea {
@@ -48,7 +54,7 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 .small { font-size: 12px; }
 .nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.st-queued, .st-running, .tone-accent { color: var(--accent); }
+.st-queued, .st-running, .tone-accent { color: var(--link); }
 .st-succeeded, .tone-success { color: var(--success); }
 .st-partial, .st-interrupted, .tone-warning { color: var(--warning); }
 .st-failed, .tone-error { color: var(--error); }
@@ -61,18 +67,19 @@ input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); bo
 
 
 .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-dim); }
-.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.dot-ok { background: var(--success); }
-.dot-checking, .dot-rejected, .dot-unpaired, .dot-setup { background: var(--warning); }
-.dot-down { background: var(--error); }
+.footer-dot { width: 7px; height: 7px; display: inline-block; flex-shrink: 0; }
+.footer-dot-ok { background: var(--success); }
+.footer-dot-rejected, .footer-dot-unpaired, .footer-dot-setup { background: var(--warning); }
+.footer-dot-down { background: var(--error); }
+.footer-dot-checking { background: var(--fg-dim); }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .logo { height: 40px; width: auto; flex-shrink: 0; }
 .brand { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .brand strong, header strong { font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
-.brand:hover strong { color: var(--accent); }
+.brand:hover strong { color: var(--link); }
 .targetrow .prompt { flex: 0 0 auto; color: var(--accent); font-weight: bold; }
 
-.qact, .sact { color: var(--accent); cursor: pointer; }
+.qact, .sact { color: var(--link); cursor: pointer; }
 .qact:hover, .sact:hover { text-decoration: underline; }
 .qact.disabled, .sact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }

@@ -16,6 +16,8 @@ const ML = self.ML;
 async function setBadge(kind, queued) {
   try {
     await browser.action.setBadgeBackgroundColor({ color: ML.outcome.badgeColor(kind) });
+    // The fills are light, so the count reads in the dark ground colour.
+    if (browser.action.setBadgeTextColor) await browser.action.setBadgeTextColor({ color: '#0d0d0d' });
     const cur = parseInt(await browser.action.getBadgeText({}), 10) || 0;
     await browser.action.setBadgeText({ text: queued ? String(cur + queued) : (cur || '') + '!' });
   } catch (e) { /* action API unavailable */ }

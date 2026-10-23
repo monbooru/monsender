@@ -62,7 +62,7 @@ images.
 
 <a href="https://addons.mozilla.org/en-US/firefox/addon/monsender/"><img alt="Get the Add-on" height="48" src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg"></a>
 
-Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> pairing**, in the **monsender extension** block.
+Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> Pairing**, in the **monsender extension** block.
 
 See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help,
 and [PRIVACY.md](PRIVACY.md).

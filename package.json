@@ -1,6 +1,6 @@
 {
   "name": "monsender",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Send the current page or its images to the download queue of the monloader server you run.",
   "private": true,
   "type": "commonjs",

@@ -22,8 +22,8 @@ body { padding: 8px; min-width: 280px; }
 .card .sizes { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; padding: 2px 4px 3px;
   border-top: 1px solid var(--border); }
 .card .size { color: var(--fg-dim); cursor: pointer; }
-.card .size:hover { color: var(--accent); text-decoration: underline; }
-.card .size.active { color: var(--accent); cursor: default; text-decoration: none; }
+.card .size:hover { color: var(--link); text-decoration: underline; }
+.card .size.active { color: var(--link); cursor: default; text-decoration: none; }
 
 .sendbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0;
   position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; z-index: 2; }

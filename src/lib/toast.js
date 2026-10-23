@@ -15,7 +15,7 @@
     'border:1px solid #2a2a36;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;' +
     'padding:8px 10px 10px;white-space:nowrap;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
     '.r{display:flex;align-items:center;gap:8px}' +
-    '.a{font:inherit;background:none;border:0;color:#5c6bc0;' +
+    '.a{font:inherit;background:none;border:0;color:#9fa8da;' +
     'padding:0;cursor:pointer;white-space:nowrap}' +
     '.a:hover{text-decoration:underline}' +
     '.x{font:inherit;background:none;border:0;color:#8888a0;cursor:pointer;padding:0}' +
