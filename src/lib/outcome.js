@@ -40,7 +40,7 @@
   }
 
   function isArchiveSkip(s) {
-    return !!s && (s.archived > 0 || (s.archived === undefined && s.skipped > 0));
+    return !!s && (s.archived || 0) > 0;
   }
 
   function singleOutcome(job) {
@@ -84,7 +84,7 @@
       return tokenHeld ? { kind: 'rejected', text: 'monloader rejected the token', tone: 'error' }
         : { kind: 'failed', text: REFUSALS.api_disabled, tone: 'error' };
     }
-    if (result.status === 200) return singleOutcome(result.data);
+    if (result.status === 200) return jobLine(result.data);
     if (result.status === 202) return singleOutcome(null);
     const refusal = REFUSALS[result.data && result.data.code];
     return { kind: 'failed', text: refusal || 'send failed (HTTP ' + result.status + ')', tone: 'error' };
@@ -109,18 +109,18 @@
   }
 
   // Not singleOutcome alone: it lets `created` win over `failed`, hiding
-  // a partial's failures.
+  // a partial's failures or an interrupted job's stop.
   function jobLine(job) {
     const j = job || {};
     if (j.status === 'running' || j.status === 'queued') {
       const p = runningProgress(j);
       return { kind: j.status, text: p ? j.status + ' ' + p : j.status, tone: 'accent' };
     }
-    if (j.status === 'partial') {
-      return { kind: 'partial', text: queueSummary(j) || 'partial', tone: 'warning' };
-    }
     if (j.status === 'interrupted' && !(j.summary && j.summary.total)) {
       return { kind: 'interrupted', text: 'interrupted - contents unknown', tone: 'warning' };
+    }
+    if (j.status === 'partial' || j.status === 'interrupted') {
+      return { kind: j.status, text: queueSummary(j) || j.status, tone: 'warning' };
     }
     return singleOutcome(j);
   }

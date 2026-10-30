@@ -1,5 +1,15 @@
 # Changelog
 
+## [v1.4.4] - 2026-10-30
+### Changed
+- Icon and theme update.
+- A browser set to light gets monloader's light theme on every page.
+
+### Fixed
+- A file monbooru cannot take shows it on a single send instead of "fetched".
+- A send that ended partial or interrupted shows its counts in amber instead of "added".
+- The popup's recent list no longer scrolls sideways.
+
 ## [v1.4.3] - 2026-10-23
 ### Changed
 - Colours follow monloader's new palette.

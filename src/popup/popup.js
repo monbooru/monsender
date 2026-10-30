@@ -234,12 +234,24 @@
     return jobs;
   }
 
-  function queueState(msg) {
+  function queueState(msg, asleep) {
     const q = $('queue');
     q.textContent = '';
     const e = document.createElement('div');
     e.className = 'empty';
-    e.textContent = msg;
+    if (asleep) {
+      const pic = document.createElement('picture');
+      const light = document.createElement('source');
+      light.media = '(prefers-color-scheme: light)';
+      light.srcset = '../assets/light/mascot-sleep-head.png';
+      const img = document.createElement('img');
+      img.src = '../assets/mascot-sleep-head.png';
+      img.alt = '';
+      img.className = 'mascot';
+      pic.append(light, img);
+      e.appendChild(pic);
+    }
+    e.appendChild(document.createTextNode(msg));
     q.appendChild(e);
     setClearEnabled(false);
   }
@@ -282,6 +294,7 @@
     site.textContent = (j.site || sites.hostOf(j.url)) + (j.gallery ? ' / ' + j.gallery : '');
     site.title = j.url || '';
     sum.textContent = outcome.jobCounts(j);
+    sum.title = sum.textContent;
     // Swapped only when the offer changes, so a focused control survives.
     const next = qactions(j);
     if (actionLabels(next) !== actionLabels(row.lastChild)) row.replaceChild(next, row.lastChild);
@@ -292,7 +305,7 @@
   function renderQueue(jobs, mine) {
     const all = outcome.groupSeries(jobs);
     const groups = all.slice(0, ROWS);
-    if (!groups.length) { queueState('queue is empty'); return; }
+    if (!groups.length) { queueState('queue is empty. (－ω－) zzZ', true); return; }
     const q = $('queue');
     if (q.firstChild && q.firstChild.className === 'empty') q.textContent = '';
     const spare = new Map();

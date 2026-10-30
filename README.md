@@ -1,20 +1,25 @@
 # monsender
 
-A small firefox or chrome extension for [monloader](https://github.com/monbooru/monloader). 
-It sends the page you are looking at, a right-clicked image or video, or images you pick from a page scan to your monloader download queue, which pushes them into monbooru.
+A Firefox and Chrome extension for [monloader](https://github.com/monbooru/monloader). It sends the page you're on, a right-clicked image or video, or images you pick from the page to monloader's download queue, which pushes them into [monbooru](https://github.com/monbooru/monbooru).
 
 ## Features
 
-- Send the current page to monloader (via toolbar or via Ctrl+Shift+L shortcut). 
-- Right-click an image or video and "Send to monloader".
-- Scan a page for images and pick which to send from a docked side panel.
+- Send the current page from the toolbar button or with Ctrl+Shift+L
+- Right-click an image or video and choose **Send to monloader**
+- Scan a page for images and pick which to send from a side panel
 - Watch and manage the monloader queue
 
 ## Related applications
 
-monsender is a companion browser extension for monloader. It hands the page you're viewing to monloader's download queue :
+monsender is a companion browser extension for monloader. It hands the page you're viewing to monloader's download queue:
 
 ```mermaid
+---
+config:
+  layout: dagre
+  flowchart:
+    wrappingWidth: 200
+---
 flowchart LR
     web["`- Any booru or gallery supported by gallery-dl
 - Direct image URL`"]
@@ -35,7 +40,7 @@ Your self-hosted booru`"]
     booru -.->|lookup by hash| loader
     loader -.->|reverse lookup: md5 + similarity| web
     ptr <-.->|"`sync: sha256 tags + aliases + implications
-contribute back (planned)`"| loader
+contribute back`"| loader
 
     classDef hub  fill:#5c6bc0,stroke:#9fa8da,stroke-width:3px,color:#ffffff;
     classDef tool fill:#16161c,stroke:#5c6bc0,stroke-width:1.5px,color:#c8c8c8;
@@ -46,34 +51,32 @@ contribute back (planned)`"| loader
     class web,ptr src;
 ```
 
-- **monsender** : this application; sends the URL of the page you're currently browsing to monloader.
-- **[monloader](https://github.com/monbooru/monloader)** : downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API; also answers monbooru's reverse lookups (boorus, IQDB/SauceNAO, Hydrus PTR) and source refetches.
-- **[monbooru](https://github.com/monbooru/monbooru)** : self-hosted booru; organizes, tags, and serves your collection.
-
-## Permissions
-
-Required permissions are minimal : `activeTab`, `scripting`, `storage`, `contextMenus`
-(and `sidePanel` on Chrome). It reads a page only on an explicit click. The
-single host it sends anything to is the monloader URL you configure; with
-previews on, the scan chooser's thumbnails load from the sites hosting the
-images.
+- **monsender**: this application; sends the URL of the page you're browsing to monloader.
+- **[monloader](https://github.com/monbooru/monloader)**: downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API; also answers monbooru's reverse lookups (boorus, IQDB/SauceNAO, Hydrus PTR) and source refetches.
+- **[monbooru](https://github.com/monbooru/monbooru)**: self-hosted booru; organizes, tags, and serves your collection.
 
 ## Install
 
-<a href="https://addons.mozilla.org/en-US/firefox/addon/monsender/"><img alt="Get the Add-on" height="48" src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg"></a>
+- **Firefox**: install it from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/monsender/).
+- **Chrome**: there's no Chrome Web Store listing. Download `monsender-chrome-v<version>.zip` from the [releases](https://github.com/monbooru/monsender/releases) and unzip it. In `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the folder.
 
-Open the extension's options, set your monloader URL, and click **connect to monloader**; approve the pairing request in monloader under **Settings -> Pairing**, in the **monsender extension** block.
+Then open the extension's options, set your monloader URL, and click **connect to monloader**. Approve the request in monloader under **Settings → Pairing**, in the **monsender extension** block.
 
-See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help,
-and [PRIVACY.md](PRIVACY.md).
+See the [monsender documentation](https://monbooru.github.io/mondocs/addons/monsender/index.html) for help.
+
+## Permissions
+
+`activeTab`, `scripting`, `storage` and `contextMenus` (plus `sidePanel` on Chrome). It reads a page only when you click, and sends only to the monloader URL you set. With previews on, the scan's thumbnails load from the sites hosting the images. See [PRIVACY.md](PRIVACY.md).
 
 ## Build
-
-Build the per-browser bundles:
 
 ```
 node build.js        # writes dist/chrome and dist/firefox
 ```
+
+## License
+
+[AGPL-3.0](LICENSE), with portions derived from MPL-2.0 code; see the license file.
 
 ## Acknowledgements
 

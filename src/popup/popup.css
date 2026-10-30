@@ -1,6 +1,6 @@
-body { width: 360px; padding: 10px; }
+body { width: 400px; padding: 10px; }
 
-.hleft { display: flex; align-items: center; gap: 10px; }
+.hleft { display: flex; align-items: last baseline; gap: 10px; }
 
 .pause-btn { background: none; border: none; padding: 0; font: inherit; font-size: 13px; color: var(--fg-dim); white-space: nowrap; }
 .pause-btn:hover:not(:disabled) { color: var(--fg); }
@@ -22,12 +22,14 @@ body { width: 360px; padding: 10px; }
   border-bottom: 1px solid var(--border); padding-bottom: 2px; margin-bottom: 4px;
   text-transform: uppercase; letter-spacing: 1px; }
 .recent-head .qact { text-transform: none; letter-spacing: 0; }
-#queue { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
+#queue { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: hidden auto;
+  margin-right: -10px; padding-right: 10px; }
 .qrow { font-size: 12px; }
 .qrow .qline { display: flex; gap: 8px; align-items: baseline; }
-.qrow .qstatus { flex: 0 0 70px; }
-.qrow .qsite { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-dim); }
-.qrow .qsum { flex: 0 0 auto; color: var(--fg-dim); }
+.qrow .qstatus { flex: 0 0 11ch; }
+.qrow .qsite { flex: 1 1 0; min-width: 10ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-dim); }
+.qrow .qsum { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-dim); }
 .qrow.mine .qsite::before { content: "* "; color: var(--accent); }
-.qrow .qactions { display: flex; gap: 8px; margin-top: 1px; }
-.empty { color: var(--fg-dim); font-size: 12px; }
+.qrow .qactions { display: flex; flex-wrap: wrap; column-gap: 8px; margin-top: 1px; }
+.empty { color: var(--fg-dim); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.empty .mascot { width: 34px; height: 34px; }
