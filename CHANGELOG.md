@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.4.5] - 2026-11-08
+### Fixed
+- A blacklisted post reads blacklisted, with its rule.
+- A failed send that still added items reads as failed with its counts instead of "added".
+- A queue row's counts match monloader's queue page, archive hits counted as skips.
+
 ## [v1.4.4] - 2026-10-30
 ### Changed
 - Icon and theme update.

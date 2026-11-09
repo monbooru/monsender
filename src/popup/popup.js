@@ -210,10 +210,10 @@
   }
 
   // monloader's DELETE acts on a whole series: sent to a live window it
-  // cancels every live one and keeps the finished ones, sent to a finished
-  // window it removes them all. A window can finish between the poll and
-  // the click, so the series is read fresh and one of its live windows gets
-  // the DELETE.
+  // cancels or drops the live ones and keeps the finished ones, sent to a
+  // finished window it removes the finished ones. A window can finish between
+  // the poll and the click, so the series is read fresh and one of its live
+  // windows gets the DELETE.
   async function cancelSeries(id) {
     const root = rootOf(shown.get(String(id)) || { id });
     const live = (await wholeQueue()).find((j) => rootOf(j) === root && !finished(j));

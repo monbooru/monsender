@@ -59,6 +59,10 @@
     if ((s.matched || 0) >= 1) return { kind: 'matched', text: 'matched', tone: 'success' };
     if ((s.duplicate || 0) >= 1) return { kind: 'duplicate', text: 'already in your library', tone: 'dim' };
     if (isArchiveSkip(s)) return { kind: 'skipped', text: 'already fetched (archive)', tone: 'dim' };
+    if ((s.blacklisted || 0) >= 1) {
+      const note = firstItemField(job, 'merge_note');
+      return { kind: 'skipped', text: note ? 'blacklisted (' + note + ')' : 'blacklisted', tone: 'dim' };
+    }
     if ((s.skipped || 0) >= 1) return { kind: 'skipped', text: ERROR_PHRASES.wrong_type, tone: 'dim' };
     if ((s.failed || 0) >= 1) {
       const code = firstItemField(job, 'error_code') || job.error_code;
@@ -109,7 +113,7 @@
   }
 
   // Not singleOutcome alone: it lets `created` win over `failed`, hiding
-  // a partial's failures or an interrupted job's stop.
+  // a partial's or a failed job's failures, or an interrupted job's stop.
   function jobLine(job) {
     const j = job || {};
     if (j.status === 'running' || j.status === 'queued') {
@@ -121,6 +125,10 @@
     }
     if (j.status === 'partial' || j.status === 'interrupted') {
       return { kind: j.status, text: queueSummary(j) || j.status, tone: 'warning' };
+    }
+    if (j.status === 'failed' && j.summary && j.summary.total) {
+      const why = j.error_code ? errorPhrase(j.error_code) : '';
+      return { kind: 'failed', text: [queueSummary(j), why].filter(Boolean).join(' - ') || 'failed', tone: 'error' };
     }
     return singleOutcome(j);
   }
@@ -136,15 +144,16 @@
   // monbooru-driven jobs, so their outcomes are here too.
   const COUNT_LABELS = {
     created: 'new', duplicate: 'dup', enriched: 'enrich', replaced: 'replace',
-    matched: 'match', skipped: 'skip', archived: 'archived', failed: 'fail', canceled: 'cancel'
+    matched: 'match', skipped: 'skip', blacklisted: 'blacklisted', failed: 'fail', canceled: 'cancel'
   };
 
-  // `archived` is part of `skipped`: it prints only when it is all of it
-  // or `skipped` is absent. Unknown keys show under their own name.
+  // `blacklisted` is part of `skipped` and comes off its count; archive hits
+  // stay in it, as monloader's queue page counts them. Unknown keys show
+  // under their own name.
   function queueSummary(job) {
-    const s = (job && job.summary) || {};
-    let keys = Object.keys(s).filter((k) => k !== 'total' && typeof s[k] === 'number' && s[k] > 0);
-    if (s.skipped !== undefined && s.archived !== s.skipped) keys = keys.filter((k) => k !== 'archived');
+    const s = Object.assign({}, job && job.summary);
+    if (s.skipped) s.skipped -= s.blacklisted || 0;
+    const keys = Object.keys(s).filter((k) => k !== 'total' && k !== 'archived' && typeof s[k] === 'number' && s[k] > 0);
     keys.sort((a, b) => order(a) - order(b));
     return keys.map((k) => s[k] + ' ' + (COUNT_LABELS[k] || k)).join(' ');
   }
