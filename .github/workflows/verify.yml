@@ -1,0 +1,47 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  base-branch:
+    name: Targets dev
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: The base branch is dev
+        run: |
+          if [ "${{ github.base_ref }}" != dev ]; then
+            echo "::error::Pull requests target dev, not ${{ github.base_ref }}: main only holds release snapshots. Edit the pull request's base branch; CONTRIBUTING.md has the details."
+            exit 1
+          fi
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Build both bundles
+        run: npm run build
+
+      - name: Install the web-ext toolchain
+        run: npm run tooling:webext
+
+      - name: Audit the web-ext toolchain
+        run: npm audit --prefix tools/webext --audit-level=high
+
+      - name: web-ext lint
+        run: npm run lint
