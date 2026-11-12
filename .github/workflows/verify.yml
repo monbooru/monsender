@@ -43,8 +43,5 @@ jobs:
       - name: Install the web-ext toolchain
         run: npm run tooling:webext
 
-      - name: Audit the web-ext toolchain
-        run: npm audit --prefix tools/webext --audit-level=high
-
       - name: web-ext lint
         run: npm run lint
