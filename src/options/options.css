@@ -1,4 +1,4 @@
-body { max-width: 680px; margin: 0 auto; padding: 16px; }
+body { min-width: 600px; max-width: 680px; margin: 0 auto; padding: 16px; }
 
 header { gap: 8px; margin-bottom: 16px; }
 header .help-link:first-of-type { margin-left: auto; }
@@ -16,5 +16,6 @@ header .help-link:first-of-type { margin-left: auto; }
 .field .hint { flex-basis: 100%; color: var(--fg-dim); font-size: 11px; padding-left: 158px; }
 .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .actions::before { content: ""; flex: 0 100 150px; }
+.actions button { flex-shrink: 0; white-space: nowrap; }
 .actions #save { margin-left: auto; }
 .actions + .conn { margin-top: 8px; }
