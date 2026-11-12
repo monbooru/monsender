@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.4.6] - 2026-11-12
+### Changed
+- monsender is on the Chrome Web Store.
+
+### Fixed
+- In Chrome, the settings page is no longer squeezed.
+
 ## [v1.4.5] - 2026-11-08
 ### Fixed
 - A blacklisted post reads blacklisted, with its rule.
