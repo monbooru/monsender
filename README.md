@@ -2,6 +2,9 @@
 
 A Firefox and Chrome extension for [monloader](https://github.com/monbooru/monloader). It sends the page you're on, a right-clicked image or video, or images you pick from the page to monloader's download queue, which pushes them into [monbooru](https://github.com/monbooru/monbooru).
 
+[![Download for Firefox](https://img.shields.io/badge/download%20for-Firefox-5c6bc0?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/monsender/)
+[![Download for Chrome](https://img.shields.io/badge/download%20for-Chrome-5c6bc0?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/monsender/jhiaelblkhpfbmaijnlbmhpcjhghnack)
+
 ## Features
 
 - Send the current page from the toolbar button or with Ctrl+Shift+L
@@ -57,8 +60,7 @@ contribute back`"| loader
 
 ## Install
 
-- **Firefox**: install it from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/monsender/).
-- **Chrome**: there's no Chrome Web Store listing. Download `monsender-chrome-v<version>.zip` from the [releases](https://github.com/monbooru/monsender/releases) and unzip it. In `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the folder.
+Install it from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/monsender/) or the [Chrome Web Store](https://chromewebstore.google.com/detail/monsender/jhiaelblkhpfbmaijnlbmhpcjhghnack).
 
 Then open the extension's options, set your monloader URL, and click **connect to monloader**. Approve the request in monloader under **Settings → Pairing**, in the **monsender extension** block.
 
