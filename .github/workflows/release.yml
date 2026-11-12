@@ -219,3 +219,66 @@ jobs:
             fi
             echo "::notice::AMO already has ${VERSION#v}; nothing to submit."
           fi
+
+      - name: Submit the Chrome bundle to the Chrome Web Store
+        if: github.repository == 'monbooru/monsender'
+        env:
+          CWS_SERVICE_ACCOUNT: ${{ secrets.CWS_SERVICE_ACCOUNT }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_ITEM_ID: jhiaelblkhpfbmaijnlbmhpcjhghnack
+        run: |
+          if [ -z "$CWS_SERVICE_ACCOUNT" ] || [ -z "$CWS_PUBLISHER_ID" ]; then
+            echo "::error::CWS_SERVICE_ACCOUNT and CWS_PUBLISHER_ID must be set to submit to the Chrome Web Store."
+            exit 1
+          fi
+          ver="${VERSION#v}"
+          b64url() { base64 -w0 | tr '+/' '-_' | tr -d '='; }
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          jq -r .private_key <<<"$CWS_SERVICE_ACCOUNT" > "$key"
+          header="$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)"
+          claims="$(jq -cn --arg iss "$(jq -r .client_email <<<"$CWS_SERVICE_ACCOUNT")" --argjson now "$(date +%s)" \
+            '{iss: $iss, scope: "https://www.googleapis.com/auth/chromewebstore", aud: "https://oauth2.googleapis.com/token", iat: $now, exp: ($now + 600)}' | b64url)"
+          sig="$(printf '%s.%s' "$header" "$claims" | openssl dgst -sha256 -sign "$key" | b64url)"
+          token="$(curl -fsS https://oauth2.googleapis.com/token \
+            -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer -d "assertion=$header.$claims.$sig" | jq -r .access_token)"
+          echo "::add-mask::$token"
+          item="publishers/$CWS_PUBLISHER_ID/items/$CWS_ITEM_ID"
+          cws() {
+            local code
+            code="$(curl -sS -o /tmp/cws.json -w '%{http_code}' -H "Authorization: Bearer $token" "$@")"
+            if [ "$code" -ge 400 ]; then
+              echo "::error::Chrome Web Store answered $code: $(cat /tmp/cws.json)"
+              exit 1
+            fi
+          }
+          status() { cws "https://chromewebstore.googleapis.com/v2/$item:fetchStatus"; }
+          status
+          known="$(jq -r --arg v "$ver" '[.publishedItemRevisionStatus, .submittedItemRevisionStatus][] | select(.distributionChannels[]?.crxVersion == $v) | .state' /tmp/cws.json | head -n1)"
+          case "$known" in
+            PENDING_REVIEW|STAGED|PUBLISHED|PUBLISHED_TO_TESTERS)
+              echo "::notice::The Chrome Web Store already has $ver ($known); nothing to submit."
+              exit 0 ;;
+            REJECTED)
+              echo "::error::The Chrome Web Store rejected $ver; see the dashboard."
+              exit 1 ;;
+          esac
+          pending="$(jq -r 'select(.submittedItemRevisionStatus.state == "PENDING_REVIEW") | .submittedItemRevisionStatus.distributionChannels[0].crxVersion // "a version"' /tmp/cws.json)"
+          if [ -n "$pending" ]; then
+            echo "::error::$pending is still in review on the Chrome Web Store; cancel it in the dashboard or wait for the review, then re-run."
+            exit 1
+          fi
+          cws -X POST -T "dist/monsender-chrome-$VERSION.zip" "https://chromewebstore.googleapis.com/upload/v2/$item:upload"
+          state="$(jq -r .uploadState /tmp/cws.json)"
+          for _ in $(seq 30); do
+            [ "$state" = IN_PROGRESS ] || break
+            sleep 10
+            status
+            state="$(jq -r .lastAsyncUploadState /tmp/cws.json)"
+          done
+          if [ "$state" != SUCCEEDED ]; then
+            echo "::error::The upload to the Chrome Web Store ended $state: $(cat /tmp/cws.json)"
+            exit 1
+          fi
+          cws -X POST "https://chromewebstore.googleapis.com/v2/$item:publish"
+          echo "::notice::Chrome Web Store: $ver submitted, $(jq -r .state /tmp/cws.json)."
