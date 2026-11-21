@@ -1,9 +1,18 @@
 'use strict';
 (function () {
-  const { storage, render, send, ui } = self.ML;
+  const { storage, render, send, ui, dest } = self.ML;
   const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
   let scan = null;
+  // The destination block's mount; null without a monloader to ask.
+  let destination = null;
+
+  // Again after a URL or token change: the lists are another monloader's.
+  function mountDestination() {
+    const old = destination;
+    destination = old ? old.then((d) => d.unmount()).then(() => dest.mount($('dest'), cfg))
+      : dest.mount($('dest'), cfg);
+  }
 
   async function init() {
     const s = await storage.getSettings();
@@ -16,6 +25,7 @@
       return;
     }
     refreshConn();
+    mountDestination();
     showStoredScan();
   }
 
@@ -35,6 +45,7 @@
         const first = !cfg.baseUrl;
         cfg = send.cfgOf(st);
         refreshConn();
+        if (cfg.baseUrl) mountDestination();
         if (first) showStoredScan();
       }
       const sc = changes.lastScan && changes.lastScan.newValue;
@@ -114,7 +125,8 @@
     setMsg('sending ' + urls.length + '...', 'dim');
     let r;
     try {
-      r = await send.sendMany(urls, { options: { pageUrl: from && from.url } });
+      const where = destination ? (await destination).options() : {};
+      r = await send.sendMany(urls, { options: Object.assign({ pageUrl: from && from.url }, where) });
     } finally {
       sending = false;
     }
