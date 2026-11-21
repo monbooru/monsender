@@ -96,6 +96,22 @@
     return req(base(cfg) + '/health', { headers: {} });
   }
 
+  // monbooru's galleries and folders, as monloader passes them on, and
+  // where a send lands by default.
+  const listGalleries = (cfg) => call(cfg, 'GET', '/api/v1/galleries');
+  const defaults = (cfg) => call(cfg, 'GET', '/api/v1/defaults');
+
+  function listFolders(cfg, gallery, path, page) {
+    const p = new URLSearchParams({ gallery: gallery || '', path: path || '' });
+    if (page > 1) p.set('page', String(page));
+    return call(cfg, 'GET', '/api/v1/folders?' + p.toString());
+  }
+
+  function searchFolders(cfg, gallery, q, limit) {
+    const p = new URLSearchParams({ gallery: gallery || '', q: q || '', limit: String(limit || 10) });
+    return call(cfg, 'GET', '/api/v1/folders/search?' + p.toString());
+  }
+
   async function listSites(cfg, q) {
     const p = q ? '?q=' + encodeURIComponent(q) : '';
     return req(base(cfg) + '/api/v1/sites' + p, { headers: headers(cfg, false) });
@@ -114,5 +130,8 @@
     return req(base(cfg) + '/api/v1/pair/status?id=' + encodeURIComponent(id), { headers: {} });
   }
 
-  return { enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus, pairRemove, sleep };
+  return {
+    enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites,
+    listGalleries, defaults, listFolders, searchFolders, pair, pairStatus, pairRemove, sleep
+  };
 });
