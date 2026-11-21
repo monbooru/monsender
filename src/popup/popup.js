@@ -1,8 +1,11 @@
 'use strict';
 (function () {
-  const { storage, api, outcome, sites, send, ui } = self.ML;
+  const { storage, api, outcome, sites, send, ui, dest } = self.ML;
   const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
+  // The destination block's mount, which resolves once its lists have
+  // loaded; null without a monloader to ask.
+  let destination = null;
   let activeUrl = '';
   let activeTabId = null;
   let paused = false;
@@ -57,6 +60,7 @@
       return;
     }
     ui.setConn('checking', 'checking');
+    destination = dest.mount($('dest'), cfg);
     hint();
     poll();
   }
@@ -97,7 +101,7 @@
     baseResult = { text: 'sending...', tone: 'dim' };
     setResult(baseResult.text, baseResult.tone);
     try {
-      const out = await send.sendOne(activeUrl);
+      const out = await send.sendOne(activeUrl, { options: (await destination).options() });
       baseResult = out.configured ? { text: out.outcome.text, tone: out.outcome.tone }
         : { text: 'set monloader URL in options', tone: 'error' };
       setResult(baseResult.text, baseResult.tone);
