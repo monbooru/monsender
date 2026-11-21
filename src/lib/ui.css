@@ -132,3 +132,34 @@ header { display: flex; align-items: last baseline; justify-content: space-betwe
 .qact, .sact { color: var(--link); cursor: pointer; }
 .qact:hover, .sact:hover { text-decoration: underline; }
 .qact.disabled, .sact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }
+
+/* The folder field, as monbooru and monloader draw it: the tree under
+   [browse] and the suggestions open over what follows, so nothing below
+   moves. */
+.fpick { position: relative; }
+.fpick-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.fpick-field { position: relative; }
+.fpick-field input { width: 100%; }
+.fpick-suggest, .fpick-panel { position: absolute; left: 0; right: 0; z-index: 10; background: var(--bg-surface); border: 1px solid var(--border); }
+.fpick-suggest { top: 100%; max-height: 200px; overflow-y: auto; }
+.fpick-suggest[hidden], .fpick-panel[hidden] { display: none; }
+.fpick-sug { display: flex; justify-content: space-between; gap: 8px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+.fpick-sug:hover { background: var(--bg-input); color: var(--link); }
+.fpick-panel { margin-top: 4px; max-height: 150px; overflow-y: auto; padding: 2px 0; }
+.fpick-tree { list-style: none; }
+.fpick-kids { padding-left: 12px; }
+.fpick-row { display: flex; align-items: baseline; gap: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+.fpick-row:hover { background: var(--bg-input); }
+.fpick-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpick-row:hover .fpick-name { text-decoration: underline; color: var(--link); }
+.fpick-row.active .fpick-name { color: var(--link); }
+.fpick-count { color: var(--fg-dim); font-size: 11px; flex-shrink: 0; }
+.fpick-toggle, .fpick-spacer { display: inline-block; width: 12px; flex-shrink: 0; color: var(--fg-dim); font-size: 10px; }
+.fpick-toggle:hover { color: var(--link); }
+.fpick-morebtn { color: var(--fg-dim); cursor: pointer; padding-left: 26px; }
+.fpick-morebtn:hover { color: var(--link); }
+.fpick-note { padding: 2px 8px; }
+.fpick-newrow { display: flex; align-items: baseline; gap: 6px; padding: 2px 8px; font-size: 12px; }
+.fpick-newform { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px 2px 26px; font-size: 12px; }
+.fpick-newform[hidden] { display: none; }
+.fpick-newname { padding: 0 4px; font-size: 12px; width: 12ch; }
