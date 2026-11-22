@@ -266,5 +266,5 @@
     };
   }
 
-  return { mount, abbrevCount };
+  return { mount };
 });

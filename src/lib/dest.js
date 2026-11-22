@@ -117,5 +117,5 @@
     };
   }
 
-  return { mount, blankLabel };
+  return { mount };
 });
