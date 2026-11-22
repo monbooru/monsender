@@ -54,8 +54,9 @@
     const out = {};
     if (o.maxItems) out.max_items = Number(o.maxItems);
     // Empty leaves the choice to monloader: the site's, then its default.
+    // The folder comes trimmed from the picker.
     if (o.gallery) out.gallery = String(o.gallery);
-    if (o.folder) out.folder = String(o.folder).trim().replace(/^\/+|\/+$/g, '');
+    if (o.folder) out.folder = String(o.folder);
     // monloader refuses a whole send whose page_url is not http(s).
     if (o.pageUrl && /^https?:/i.test(o.pageUrl)) out.page_url = o.pageUrl;
     return out;
