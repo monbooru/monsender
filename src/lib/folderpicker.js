@@ -43,6 +43,7 @@
 
   function mount(container, opts) {
     const doc = container.ownerDocument;
+    const { onActivate } = ns().ui;
     const box = el(doc, 'div', 'fpick');
     const head = el(doc, 'div', 'fpick-head');
     const label = el(doc, 'label', 'small muted', opts.label || 'folder');
@@ -134,9 +135,10 @@
       const shown = ul.childElementCount;
       if (shown < (r.total || 0)) {
         const li = el(doc, 'li', 'fpick-more');
-        const more = el(doc, 'span', 'fpick-morebtn small', '[more]');
+        const more = action(doc, '[more]');
+        more.className = 'fpick-morebtn small';
         more.title = (r.total - shown) + ' more';
-        more.addEventListener('click', () => loadLevel(ul, path, page + 1, seq));
+        onActivate(more, () => loadLevel(ul, path, page + 1, seq));
         li.appendChild(more);
         ul.appendChild(li);
       }
@@ -154,7 +156,8 @@
       li.dataset.path = f.path;
       const r = el(d, 'div', 'fpick-row');
       r.dataset.path = f.path;
-      const t = branch ? el(d, 'span', 'fpick-toggle', '▶') : el(d, 'span', 'fpick-spacer');
+      const t = branch ? action(d, '▶') : el(d, 'span', 'fpick-spacer');
+      if (branch) t.className = 'fpick-toggle';
       const name = el(d, 'span', 'fpick-name', f.path ? f.name + '/' : '');
       if (f.path) name.title = f.path + '/';
       r.append(t, name);
@@ -169,9 +172,10 @@
         n.kids = el(d, 'ul', 'fpick-tree fpick-kids');
         n.kids.hidden = true;
         li.appendChild(n.kids);
-        t.addEventListener('click', (e) => { e.stopPropagation(); toggle(n, n.kids.hidden); });
+        onActivate(t, () => toggle(n, n.kids.hidden));
       }
-      r.addEventListener('click', () => pick(f.path));
+      // The toggle sits in the row: opening a branch does not pick it.
+      r.addEventListener('click', (e) => { if (!e.target.closest('.fpick-toggle')) pick(f.path); });
       return n;
     }
 
@@ -235,7 +239,6 @@
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !suggest.hidden) { e.preventDefault(); closeSuggest(); } });
     input.addEventListener('blur', closeSuggest);
-    const { onActivate } = ns().ui;
     onActivate(browse, () => openPanel(panel.hidden));
     onActivate(newBtn, openNewFolder);
     onActivate(newOk, takeNewFolder);
