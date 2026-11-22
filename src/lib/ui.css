@@ -140,14 +140,14 @@ header { display: flex; align-items: last baseline; justify-content: space-betwe
 .dest-gallery select { flex: 1; min-width: 0; }
 
 /* The folder field, as monbooru and monloader draw it. The suggestions
-   open over what follows; the tree under [browse] takes its own room, as
-   the popup sizes itself to its content and would not count an overlay. */
+   and the tree under [browse] take their own room: the popup sizes itself
+   to its content and would not count an overlay. */
 .fpick { position: relative; }
 .fpick-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .fpick-field { position: relative; }
 .fpick-field input { width: 100%; }
 .fpick-suggest, .fpick-panel { background: var(--bg-surface); border: 1px solid var(--border); }
-.fpick-suggest { position: absolute; left: 0; right: 0; top: 100%; z-index: 10; max-height: 200px; overflow-y: auto; }
+.fpick-suggest { margin-top: 2px; max-height: 150px; overflow-y: auto; }
 .fpick-suggest[hidden], .fpick-panel[hidden] { display: none; }
 .fpick-sug { display: flex; justify-content: space-between; gap: 8px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
 .fpick-sug:hover { background: var(--bg-input); color: var(--link); }
