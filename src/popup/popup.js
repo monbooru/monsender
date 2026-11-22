@@ -3,8 +3,8 @@
   const { storage, api, outcome, sites, send, ui, dest } = self.ML;
   const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
-  // The destination block's mount, which resolves once its lists have
-  // loaded; null without a monloader to ask.
+  // The destination block's mount, which resolves once its fields are up;
+  // null without a monloader to ask.
   let destination = null;
   let activeUrl = '';
   let activeTabId = null;

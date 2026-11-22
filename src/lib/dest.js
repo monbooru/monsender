@@ -92,15 +92,20 @@
     }
     browser.storage.onChanged.addListener(follow);
 
-    // Without the lists (an older monloader, or none reached) the fields
-    // still take typing.
-    const [g, d] = await Promise.all([api.listGalleries(cfg), api.defaults(cfg)]);
-    const galleries = g.ok && g.data && Array.isArray(g.data.galleries) ? g.data.galleries : [];
-    const active = galleries.find((x) => x.active);
-    defaultGallery = (d.ok && d.data && d.data.gallery) || (active ? active.name : '');
-    names = galleries.map((x) => x.name);
+    // In the background: a send needs only the fields, and monloader can
+    // take its time asking monbooru. Without the lists (an older monloader,
+    // or none reached) the fields still take typing.
+    async function loadLists() {
+      const [g, d] = await Promise.all([api.listGalleries(cfg), api.defaults(cfg)]);
+      const galleries = g.ok && g.data && Array.isArray(g.data.galleries) ? g.data.galleries : [];
+      const active = galleries.find((x) => x.active);
+      defaultGallery = (d.ok && d.data && d.data.gallery) || (active ? active.name : '');
+      names = galleries.map((x) => x.name);
+      fillGalleries(names, defaultGallery);
+      picker.setBlank(blankLabel(d.ok && d.data ? d.data.folder : ''));
+    }
     fillGalleries(names, defaultGallery);
-    picker.setBlank(blankLabel(d.ok && d.data ? d.data.folder : ''));
+    loadLists();
 
     return {
       // The send options for this destination.
