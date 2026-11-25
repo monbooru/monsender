@@ -8,10 +8,11 @@
   let destination = null;
 
   // Again after a URL or token change: the lists are another monloader's.
+  // The blanks follow the scanned page, whose site can set its own.
   function mountDestination() {
     const old = destination;
-    destination = old ? old.then((d) => d.unmount()).then(() => dest.mount($('dest'), cfg))
-      : dest.mount($('dest'), cfg);
+    const mount = () => dest.mount($('dest'), cfg, scan && scan.url);
+    destination = old ? old.then((d) => d.unmount()).then(mount) : mount();
   }
 
   async function init() {
@@ -34,6 +35,7 @@
     if (scan) return; // a fresher one landed while this read was in flight
     scan = stored;
     renderChooser();
+    if (destination && scan) destination.then((d) => d.setPage(scan.url));
   }
 
   // The panel stays open across pairing, URL changes and outages, so the dot
@@ -49,7 +51,12 @@
         if (first) showStoredScan();
       }
       const sc = changes.lastScan && changes.lastScan.newValue;
-      if (sc && Array.isArray(sc.items)) { scan = sc; renderChooser(); refreshConn(); }
+      if (sc && Array.isArray(sc.items)) {
+        scan = sc;
+        renderChooser();
+        refreshConn();
+        if (destination) destination.then((d) => d.setPage(sc.url));
+      }
     });
   }
 

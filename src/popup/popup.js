@@ -60,7 +60,7 @@
       return;
     }
     ui.setConn('checking', 'checking');
-    destination = dest.mount($('dest'), cfg);
+    destination = dest.mount($('dest'), cfg, activeUrl);
     hint();
     poll();
   }
