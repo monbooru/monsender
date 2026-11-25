@@ -149,6 +149,7 @@ header { display: flex; align-items: last baseline; justify-content: space-betwe
 .fpick-suggest[hidden], .fpick-panel[hidden] { display: none; }
 .fpick-sug { display: flex; justify-content: space-between; gap: 8px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
 .fpick-sug:hover { background: var(--bg-input); color: var(--link); }
+.fpick-sug.kbd-focused { background: var(--bg-input); outline: 1px solid var(--link); outline-offset: -1px; }
 .fpick-panel { margin-top: 4px; max-height: 150px; overflow-y: auto; padding: 2px 0; }
 .fpick-tree { list-style: none; }
 .fpick-kids { padding-left: 12px; }

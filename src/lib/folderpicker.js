@@ -223,6 +223,7 @@
       suggest.textContent = '';
       for (const f of found || []) {
         const b = el(doc, 'div', 'fpick-sug');
+        b.dataset.path = f.path;
         b.append(el(doc, 'span', '', f.path + '/'), el(doc, 'span', 'fpick-count', abbrevCount(f.images || 0)));
         // mousedown, not click: the field's blur would close the list first.
         b.addEventListener('mousedown', (e) => { e.preventDefault(); pick(f.path); });
@@ -237,7 +238,27 @@
       clearTimeout(typingTimer);
       typingTimer = setTimeout(runSearch, SUGGEST_DELAY_MS);
     });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !suggest.hidden) { e.preventDefault(); closeSuggest(); } });
+    // As monloader's handleSuggestKey: the arrows walk the list, Enter takes
+    // the one walked to, and an open list takes Escape.
+    input.addEventListener('keydown', (e) => {
+      if (suggest.hidden) return;
+      const items = Array.from(suggest.children);
+      const focused = suggest.querySelector('.kbd-focused');
+      let idx = items.indexOf(focused);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (focused) focused.classList.remove('kbd-focused');
+        idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+        items[idx].classList.add('kbd-focused');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && focused) {
+        e.preventDefault();
+        pick(focused.dataset.path);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSuggest();
+      }
+    });
     input.addEventListener('blur', closeSuggest);
     onActivate(browse, () => openPanel(panel.hidden));
     onActivate(newBtn, openNewFolder);
