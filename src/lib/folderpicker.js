@@ -12,7 +12,8 @@
   //
   // opts.load(path, page) resolves { total, results } or null when the
   // folders cannot be listed; opts.search(q) resolves a list or null; every
-  // result is { path, name, images, folders }.
+  // result is { path, name, images, folders }. opts.lead are nodes put
+  // ahead of the field on its row.
 
   const G = typeof self !== 'undefined' ? self : globalThis;
   function ns() { return G.ML; }
@@ -45,22 +46,18 @@
     const doc = container.ownerDocument;
     const { onActivate } = ns().ui;
     const box = el(doc, 'div', 'fpick');
-    const head = el(doc, 'div', 'fpick-head');
-    const label = el(doc, 'label', 'small muted', opts.label || 'folder');
-    const browse = action(doc, '[browse]');
-    browse.classList.add('small');
-    head.append(label, browse);
-
-    const field = el(doc, 'div', 'fpick-field');
+    const line = el(doc, 'div', 'fpick-line');
     const input = el(doc, 'input');
     input.type = 'text';
     input.autocomplete = 'off';
     input.id = opts.id || 'fpick-input';
-    label.htmlFor = input.id;
+    input.setAttribute('aria-label', opts.label || 'folder');
     input.value = opts.value || '';
+    const browse = action(doc, '[browse]');
+    browse.classList.add('small');
+    line.append(...(opts.lead || []), input, browse);
     const suggest = el(doc, 'div', 'fpick-suggest');
     suggest.hidden = true;
-    field.append(input, suggest);
 
     const panel = el(doc, 'div', 'fpick-panel');
     panel.hidden = true;
@@ -81,7 +78,7 @@
     newRow.append(el(doc, 'span', 'fpick-spacer'), newBtn, newForm);
     panel.append(top, tree, newRow);
 
-    box.append(head, field, panel);
+    box.append(line, suggest, panel);
     container.appendChild(box);
 
     // A slower answer to an older request must not land over a newer one.

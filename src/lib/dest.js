@@ -36,16 +36,17 @@
       return f.value ? '(' + f.from + ': ' + f.value + ')' : '(default)';
     }
 
-    const galleryRow = doc.createElement('div');
-    galleryRow.className = 'dest-gallery';
-    const glabel = doc.createElement('label');
-    glabel.className = 'small muted';
-    glabel.textContent = 'gallery';
-    glabel.htmlFor = 'dest-gallery';
+    // One row, to [gallery] / [folder] [browse], with the picker's lists
+    // opening under it.
+    const span = (text) => {
+      const s = doc.createElement('span');
+      s.className = 'muted small';
+      s.textContent = text;
+      return s;
+    };
     const select = doc.createElement('select');
     select.id = 'dest-gallery';
-    galleryRow.append(glabel, select);
-    container.appendChild(galleryRow);
+    select.setAttribute('aria-label', 'gallery');
 
     // The folders listed are those of the gallery the send goes to: the
     // one picked, or the one an empty field sends to.
@@ -53,6 +54,7 @@
 
     const picker = folderPicker.mount(container, {
       id: 'dest-folder',
+      lead: [span('to'), select, span('/')],
       value: dest.folder,
       load: async (path, page) => {
         const r = await api.listFolders(cfg, listed(), path, page);

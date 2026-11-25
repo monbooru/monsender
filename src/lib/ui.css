@@ -133,17 +133,16 @@ header { display: flex; align-items: last baseline; justify-content: space-betwe
 .qact:hover, .sact:hover { text-decoration: underline; }
 .qact.disabled, .sact.disabled { color: var(--fg-dim); cursor: default; pointer-events: none; text-decoration: none; }
 
-/* Where a send goes: the gallery, then the folder. */
-.dest { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+/* Where a send goes: to [gallery] / [folder] [browse] on one row. */
+.dest { margin-bottom: 8px; }
 .dest:empty { display: none; }
-.dest-gallery { display: flex; align-items: baseline; gap: 8px; }
-.dest-gallery select { flex: 1; min-width: 0; }
+.dest select { flex: 0 1 auto; min-width: 0; max-width: 45%; }
 
 /* The folder field, as monbooru and monloader draw it. The suggestions
    and the tree under [browse] take their own room: the popup sizes itself
    to its content and would not count an overlay. */
-.fpick-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
-.fpick-field input { width: 100%; }
+.fpick-line { display: flex; align-items: center; gap: 6px; }
+.fpick-line input { flex: 1; min-width: 0; }
 .fpick-suggest, .fpick-panel { background: var(--bg-surface); border: 1px solid var(--border); }
 .fpick-suggest { margin-top: 2px; max-height: 150px; overflow-y: auto; }
 .fpick-suggest[hidden], .fpick-panel[hidden] { display: none; }
