@@ -10,12 +10,18 @@
 
   function cfgOf(s) { return { baseUrl: s.baseUrl, token: s.token }; }
 
+  // The picked gallery and folder hold for every send until emptied, the
+  // right-click and shortcut ones too; options passed in win over them.
+  async function withDestination(options) {
+    return Object.assign({}, await ns().storage.getDestination(), options);
+  }
+
   async function sendOne(url, opts) {
     opts = opts || {};
     const s = await ns().storage.getSettings();
     if (!s.baseUrl) return { configured: false };
     const wait = opts.wait != null ? opts.wait : s.waitSeconds;
-    const result = await ns().api.enqueue(cfgOf(s), url, { wait, options: opts.options });
+    const result = await ns().api.enqueue(cfgOf(s), url, { wait, options: await withDestination(opts.options) });
     const job = result.status === 200 ? result.data : null;
     const jobId = job ? job.id : (result.data && result.data.job_id);
     return { configured: true, result, job, jobId, outcome: ns().outcome.enqueueOutcome(result, !!s.token) };
@@ -29,7 +35,7 @@
     const failedUrls = [];
     let outcome = null;
     await ns().api.enqueueBatch(cfgOf(s), urls, {
-      options: opts.options,
+      options: await withDestination(opts.options),
       onEach: (u, r) => {
         const id = r.data && (r.data.job_id || r.data.id);
         if (id) { ids.push(id); return; }
