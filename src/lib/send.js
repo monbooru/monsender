@@ -10,8 +10,6 @@
 
   function cfgOf(s) { return { baseUrl: s.baseUrl, token: s.token }; }
 
-  // The picked gallery and folder hold for every send until emptied, the
-  // right-click and shortcut ones too; options passed in win over them.
   async function withDestination(options) {
     return Object.assign({}, await ns().storage.getDestination(), options);
   }

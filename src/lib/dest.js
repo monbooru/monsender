@@ -5,11 +5,6 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  // Where the popup's and the panel's sends go: a gallery and a folder,
-  // kept in storage until emptied. Empty leaves the choice to monloader,
-  // which takes the site's own, then its defaults, field by field; the
-  // blanks say which, for the page the send comes from.
-
   const G = typeof self !== 'undefined' ? self : globalThis;
   function ns() { return G.ML; }
 
@@ -19,13 +14,11 @@
     const saved = await storage.getDestination();
     let dest = Object.assign({}, saved);
 
-    // As /api/v1/defaults answers; activeGallery stands in for an empty
-    // default gallery, which is monbooru's active one.
     let defaults = { gallery: '', folder: '', sites: [] };
+    // An empty default gallery is monbooru's active one.
     let activeGallery = '';
     let category = '';
 
-    // Where an empty field sends: the page's site's own, then the default.
     function fallback(field) {
       const site = category ? defaults.sites.find((s) => s.name === category) : null;
       if (site && site[field]) return { from: category, value: site[field] };
@@ -36,8 +29,6 @@
       return f.value ? '(' + f.from + ': ' + f.value + ')' : '(default)';
     }
 
-    // One row, to [gallery] / [folder] [browse], with the picker's lists
-    // opening under it.
     const span = (text) => {
       const s = doc.createElement('span');
       s.className = 'muted small';
@@ -48,8 +39,6 @@
     select.id = 'dest-gallery';
     select.setAttribute('aria-label', 'gallery');
 
-    // The folders listed are those of the gallery the send goes to: the
-    // one picked, or the one an empty field sends to.
     const listed = () => dest.gallery || fallback('gallery').value;
 
     const picker = folderPicker.mount(container, {
@@ -159,7 +148,6 @@
     setPage(pageUrl);
 
     return {
-      // The send options for this destination.
       options: () => ({ gallery: dest.gallery, folder: picker.value() }),
       // The panel's scan can move to another page while it stays open.
       setPage,

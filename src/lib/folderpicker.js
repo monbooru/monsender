@@ -5,11 +5,6 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  // The folder field of monbooru and monloader, rebuilt without htmx: a text
-  // box that the suggestions, the tree under [browse] and [+ new folder] all
-  // write into. It knows nothing of monloader: the mounting page passes how
-  // to read a level and how to search.
-  //
   // opts.load(path, page) resolves { total, results } or null when the
   // folders cannot be listed; opts.search(q) resolves a list or null; every
   // result is { path, name, images, folders }. opts.lead are nodes put
@@ -111,8 +106,6 @@
       suggest.textContent = '';
     }
 
-    // One level into ul; page 1 replaces it, later pages follow the rows
-    // already there. The branch toward the field's folder opens itself.
     async function loadLevel(ul, path, page, seq) {
       const r = await opts.load(path, page);
       if (seq !== treeSeq) return;
@@ -187,7 +180,6 @@
       }
     }
 
-    // Under the folder the field holds, or at the top with none.
     function openNewFolder() {
       const under = value();
       newForm.dataset.under = under ? under + '/' : '';
@@ -235,8 +227,6 @@
       clearTimeout(typingTimer);
       typingTimer = setTimeout(runSearch, SUGGEST_DELAY_MS);
     });
-    // As monloader's handleSuggestKey: the arrows walk the list, Enter takes
-    // the one walked to, and an open list takes Escape.
     input.addEventListener('keydown', (e) => {
       if (suggest.hidden) return;
       const items = Array.from(suggest.children);

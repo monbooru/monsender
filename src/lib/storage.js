@@ -25,8 +25,6 @@
     return Object.assign({}, DEFAULTS, r.settings);
   }
 
-  // Where the popup's and the panel's sends go, kept until emptied; empty
-  // fields leave the choice to monloader.
   const NO_DESTINATION = { gallery: '', folder: '' };
 
   // Job ids are numbered per instance, and galleries and folders are

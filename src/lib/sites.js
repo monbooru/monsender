@@ -70,7 +70,6 @@
     return matchHost(list, url) ? 'supported' : 'unknown';
   }
 
-  // The gallery-dl category of the site url belongs to, '' for none.
   async function categoryFor(cfg, url) {
     if (!hostOf(url)) return '';
     const s = siteOf(await fetchSites(cfg), url);

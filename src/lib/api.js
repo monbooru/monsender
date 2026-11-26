@@ -97,8 +97,6 @@
     return req(base(cfg) + '/health', { headers: {} });
   }
 
-  // monbooru's galleries and folders, as monloader passes them on, and
-  // where a send lands by default.
   const listGalleries = (cfg) => call(cfg, 'GET', '/api/v1/galleries');
   const defaults = (cfg) => call(cfg, 'GET', '/api/v1/defaults');
 
