@@ -81,9 +81,12 @@
     let treeSeq = 0;
     let typingTimer = null;
 
-    function setBlank(text) {
+    let blankTitle = '';
+    function setBlank(text, title) {
       input.placeholder = text;
       blank.name.textContent = text;
+      blankTitle = blank.name.title = title || '';
+      markActive();
     }
     setBlank(opts.blank || '(default)');
 
@@ -91,6 +94,7 @@
 
     function markActive() {
       const v = value();
+      input.title = v ? '' : blankTitle;
       box.querySelectorAll('.fpick-row').forEach((r) => r.classList.toggle('active', r.dataset.path === v));
     }
 

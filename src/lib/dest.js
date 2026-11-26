@@ -24,9 +24,9 @@
       if (site && site[field]) return { from: category, value: site[field] };
       return { from: 'default', value: field === 'gallery' ? defaults.gallery || activeGallery : defaults.folder };
     }
-    function blankLabel(field) {
+    function blank(field) {
       const f = fallback(field);
-      return f.value ? '(' + f.from + ': ' + f.value + ')' : '(default)';
+      return f.value ? { text: '(' + f.value + ')', title: f.from + ': ' + f.value } : { text: '(default)', title: '' };
     }
 
     const span = (text) => {
@@ -60,7 +60,9 @@
       select.textContent = '';
       const first = doc.createElement('option');
       first.value = '';
-      first.textContent = blankLabel('gallery');
+      const b = blank('gallery');
+      first.textContent = b.text;
+      first.title = b.title;
       select.appendChild(first);
       // A gallery kept from an earlier pick stays offered, even one
       // monloader no longer lists, so the field shows what a send uses.
@@ -72,6 +74,7 @@
         select.appendChild(o);
       }
       select.value = dest.gallery;
+      select.title = dest.gallery ? '' : b.title;
     }
 
     let names = [];
@@ -87,12 +90,14 @@
 
     function refresh() {
       fillGalleries();
-      picker.setBlank(blankLabel('folder'));
+      const b = blank('folder');
+      picker.setBlank(b.text, b.title);
       relist();
     }
 
     select.addEventListener('change', () => {
       dest.gallery = select.value;
+      select.title = dest.gallery ? '' : select.options[0].title;
       storage.setDestination({ gallery: dest.gallery });
       relist();
     });
