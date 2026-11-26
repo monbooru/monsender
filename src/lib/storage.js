@@ -25,12 +25,28 @@
     return Object.assign({}, DEFAULTS, r.settings);
   }
 
-  // Job ids are numbered per instance, so the ring does not outlive a URL
-  // change: another monloader's rows would match it.
+  // Where the popup's and the panel's sends go, kept until emptied; empty
+  // fields leave the choice to monloader.
+  const NO_DESTINATION = { gallery: '', folder: '' };
+
+  // Job ids are numbered per instance, and galleries and folders are
+  // another monloader's, so neither outlives a URL change.
   async function setSettings(patch) {
     const cur = await getSettings();
     const next = Object.assign({}, cur, patch);
-    await area().set(next.baseUrl === cur.baseUrl ? { settings: next } : { settings: next, recentJobIds: [] });
+    await area().set(next.baseUrl === cur.baseUrl ? { settings: next }
+      : { settings: next, recentJobIds: [], destination: NO_DESTINATION });
+    return next;
+  }
+
+  async function getDestination() {
+    const r = await area().get('destination');
+    return Object.assign({}, NO_DESTINATION, r.destination);
+  }
+
+  async function setDestination(patch) {
+    const next = Object.assign(await getDestination(), patch);
+    await area().set({ destination: next });
     return next;
   }
 
@@ -57,7 +73,7 @@
   const getSitesCache = () => sessionGet('sitesCache');
 
   return {
-    getSettings, setSettings, getRecentJobIds, addRecentJobIds,
+    getSettings, setSettings, getDestination, setDestination, getRecentJobIds, addRecentJobIds,
     setScan, getScan, setSitesCache, getSitesCache
   };
 });

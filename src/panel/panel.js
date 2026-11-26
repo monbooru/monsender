@@ -1,9 +1,19 @@
 'use strict';
 (function () {
-  const { storage, render, send, ui } = self.ML;
+  const { storage, render, send, ui, dest } = self.ML;
   const $ = ui.$;
   let cfg = { baseUrl: '', token: '' };
   let scan = null;
+  // The destination block's mount; null without a monloader to ask.
+  let destination = null;
+
+  // Again after a URL or token change: the lists are another monloader's.
+  // The blanks follow the scanned page, whose site can set its own.
+  function mountDestination() {
+    const old = destination;
+    const mount = () => dest.mount($('dest'), cfg, scan && scan.url);
+    destination = old ? old.then((d) => d.unmount()).then(mount) : mount();
+  }
 
   async function init() {
     const s = await storage.getSettings();
@@ -16,6 +26,7 @@
       return;
     }
     refreshConn();
+    mountDestination();
     showStoredScan();
   }
 
@@ -24,6 +35,7 @@
     if (scan) return; // a fresher one landed while this read was in flight
     scan = stored;
     renderChooser();
+    if (destination && scan) destination.then((d) => d.setPage(scan.url));
   }
 
   // The panel stays open across pairing, URL changes and outages, so the dot
@@ -35,10 +47,16 @@
         const first = !cfg.baseUrl;
         cfg = send.cfgOf(st);
         refreshConn();
+        if (cfg.baseUrl) mountDestination();
         if (first) showStoredScan();
       }
       const sc = changes.lastScan && changes.lastScan.newValue;
-      if (sc && Array.isArray(sc.items)) { scan = sc; renderChooser(); refreshConn(); }
+      if (sc && Array.isArray(sc.items)) {
+        scan = sc;
+        renderChooser();
+        refreshConn();
+        if (destination) destination.then((d) => d.setPage(sc.url));
+      }
     });
   }
 
@@ -114,7 +132,8 @@
     setMsg('sending ' + urls.length + '...', 'dim');
     let r;
     try {
-      r = await send.sendMany(urls, { options: { pageUrl: from && from.url } });
+      const where = destination ? (await destination).options() : {};
+      r = await send.sendMany(urls, { options: Object.assign({ pageUrl: from && from.url }, where) });
     } finally {
       sending = false;
     }
