@@ -60,7 +60,7 @@ contribute back`"| loader
 - **monsender**: this application; sends the URL of the page you're browsing to monloader.
 - **[monloader](https://github.com/monbooru/monloader)**: downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API; also answers monbooru's reverse lookups (boorus, IQDB/SauceNAO, Hydrus PTR) and source refetches.
 - **[monbooru](https://github.com/monbooru/monbooru)**: self-hosted booru; organizes, tags, and serves your collection.
-- **[monworker](https://github.com/monbooru/monworker)**: ML worker; runs the auto-tagging models for monbooru, on the same machine or on another one with a GPU.
+- **[monworker](https://github.com/monbooru/monworker)**: Machine Learning worker; runs the auto-tagging models for monbooru, on the same machine or on another one.
 
 ## Install
 
