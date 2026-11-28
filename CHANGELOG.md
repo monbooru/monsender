@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.0] - 2026-11-28
+### Added
+- You can pick the gallery and folder a send goes to, in the popup and in the panel. ([#5](https://github.com/monbooru/monsender/issues/5), thanks @IkariDevGIT for the code)
+
+Co-authored-by: IkariDevGIT <90197782+IkariDevGIT@users.noreply.github.com>
+
 ## [v1.4.6] - 2026-11-12
 ### Changed
 - monsender is on the Chrome Web Store.
