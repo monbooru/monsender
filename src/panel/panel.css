@@ -27,3 +27,7 @@ body { padding: 8px; min-width: 280px; }
 
 .sendbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0;
   position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; z-index: 2; }
+/* In the sticky bar, so where a send goes stays in view with the button. */
+.sendbar .dest { flex: 0 0 100%; min-width: 0; margin-bottom: 0; }
+.sendbar #sendSel { flex: 1; }
+.sendbar #scanmsg:empty { display: none; }

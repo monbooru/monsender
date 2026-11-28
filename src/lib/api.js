@@ -53,6 +53,10 @@
   function cleanOptions(o) {
     const out = {};
     if (o.maxItems) out.max_items = Number(o.maxItems);
+    // Empty leaves the choice to monloader: the site's, then its default.
+    // The folder comes trimmed from the picker.
+    if (o.gallery) out.gallery = String(o.gallery);
+    if (o.folder) out.folder = String(o.folder);
     // monloader refuses a whole send whose page_url is not http(s).
     if (o.pageUrl && /^https?:/i.test(o.pageUrl)) out.page_url = o.pageUrl;
     return out;
@@ -93,6 +97,20 @@
     return req(base(cfg) + '/health', { headers: {} });
   }
 
+  const listGalleries = (cfg) => call(cfg, 'GET', '/api/v1/galleries');
+  const defaults = (cfg) => call(cfg, 'GET', '/api/v1/defaults');
+
+  function listFolders(cfg, gallery, path, page) {
+    const p = new URLSearchParams({ gallery: gallery || '', path: path || '' });
+    if (page > 1) p.set('page', String(page));
+    return call(cfg, 'GET', '/api/v1/folders?' + p.toString());
+  }
+
+  function searchFolders(cfg, gallery, q, limit) {
+    const p = new URLSearchParams({ gallery: gallery || '', q: q || '', limit: String(limit || 10) });
+    return call(cfg, 'GET', '/api/v1/folders/search?' + p.toString());
+  }
+
   async function listSites(cfg, q) {
     const p = q ? '?q=' + encodeURIComponent(q) : '';
     return req(base(cfg) + '/api/v1/sites' + p, { headers: headers(cfg, false) });
@@ -111,5 +129,8 @@
     return req(base(cfg) + '/api/v1/pair/status?id=' + encodeURIComponent(id), { headers: {} });
   }
 
-  return { enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites, pair, pairStatus, pairRemove, sleep };
+  return {
+    enqueue, enqueueBatch, listQueue, getJob, retry, continueJob, continueAll, remove, pause, resume, health, listSites,
+    listGalleries, defaults, listFolders, searchFolders, pair, pairStatus, pairRemove, sleep
+  };
 });

@@ -14,15 +14,25 @@
 
   // Exact host or subdomain, never a substring: e621.net.evil.example
   // must not pass. The example names one host; mirrors come from hosts.
-  function matchHost(sites, url) {
+  // The site whose host matches the most of url's wins, so a CDN host
+  // listed under one site is not taken by its parent domain's.
+  function siteOf(sites, url) {
     const host = hostOf(url);
-    if (!host) return false;
+    if (!host) return null;
     const list = Array.isArray(sites) ? sites : (sites && sites.sites) || [];
     const covers = (h) => !!h && (host === h || host.endsWith('.' + h));
-    return list.some((s) =>
-      covers(hostOf(s && s.example)) ||
-      ((s && s.hosts) || []).some((h) => covers(String(h).replace(/^www\./, ''))));
+    let best = null;
+    let bestLen = 0;
+    for (const s of list) {
+      if (!s) continue;
+      for (const h of [hostOf(s.example), ...(s.hosts || []).map((x) => String(x).replace(/^www\./, ''))]) {
+        if (covers(h) && h.length > bestLen) { best = s; bestLen = h.length; }
+      }
+    }
+    return best;
   }
+
+  function matchHost(sites, url) { return !!siteOf(sites, url); }
 
   const TTL_MS = 5 * 60 * 1000;
   // A warm copy only: the list lives in storage.session, as the MV3
@@ -60,11 +70,17 @@
     return matchHost(list, url) ? 'supported' : 'unknown';
   }
 
+  async function categoryFor(cfg, url) {
+    if (!hostOf(url)) return '';
+    const s = siteOf(await fetchSites(cfg), url);
+    return (s && s.category) || '';
+  }
+
   // Exported for the tests, which need the module cache reset between cases.
   async function clearCache() {
     listCache = null;
     try { await ns().storage.setSitesCache(null); } catch (e) { /* no extension storage */ }
   }
 
-  return { hostOf, matchHost, sendKind, clearCache };
+  return { hostOf, matchHost, sendKind, categoryFor, clearCache };
 });

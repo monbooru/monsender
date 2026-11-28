@@ -34,6 +34,8 @@ browser extension`"])
 downloader`"]
     booru["`**monbooru**
 Your self-hosted booru`"]
+    worker["`**monworker**
+Machine Learning worker`"]
 
     web -->|browse| sender
     sender -->|send URL| loader
@@ -44,19 +46,21 @@ Your self-hosted booru`"]
     loader -.->|reverse lookup: md5 + similarity| web
     ptr <-.->|"`sync: sha256 tags + aliases + implications
 contribute back`"| loader
+    worker <-.->|handle auto-tagging| booru
 
     classDef hub  fill:#5c6bc0,stroke:#9fa8da,stroke-width:3px,color:#ffffff;
     classDef tool fill:#16161c,stroke:#5c6bc0,stroke-width:1.5px,color:#c8c8c8;
     classDef src  fill:#16161c,stroke:#8888a0,stroke-width:1px,color:#8888a0;
 
     class sender hub;
-    class loader,booru tool;
+    class loader,booru,worker tool;
     class web,ptr src;
 ```
 
 - **monsender**: this application; sends the URL of the page you're browsing to monloader.
 - **[monloader](https://github.com/monbooru/monloader)**: downloader; fetches files and per-post metadata (via gallery-dl) and pushes them into a monbooru gallery over the REST API; also answers monbooru's reverse lookups (boorus, IQDB/SauceNAO, Hydrus PTR) and source refetches.
 - **[monbooru](https://github.com/monbooru/monbooru)**: self-hosted booru; organizes, tags, and serves your collection.
+- **[monworker](https://github.com/monbooru/monworker)**: Machine Learning worker; runs the auto-tagging models for monbooru, on the same machine or on another one.
 
 ## Install
 
