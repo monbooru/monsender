@@ -135,7 +135,7 @@ header { display: flex; align-items: last baseline; justify-content: space-betwe
 
 .dest { margin-bottom: 8px; }
 .dest:empty { display: none; }
-.dest select { flex: 0 1 auto; min-width: 0; max-width: 45%; }
+.dest select { flex: 0 1 auto; min-width: 0; max-width: 45%; height: 28px; }
 
 /* The suggestions and the tree under [browse] take their own room: the
    popup sizes itself to its content and would not count an overlay. */

@@ -43,7 +43,7 @@
 
     const picker = folderPicker.mount(container, {
       id: 'dest-folder',
-      lead: [span('to'), select, span('/')],
+      lead: [select, span('/')],
       value: dest.folder,
       load: async (path, page) => {
         const r = await api.listFolders(cfg, listed(), path, page);
